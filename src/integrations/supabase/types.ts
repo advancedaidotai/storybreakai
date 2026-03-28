@@ -14,7 +14,205 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      breakpoints: {
+        Row: {
+          confidence: number | null
+          id: string
+          project_id: string
+          reason: string | null
+          timestamp_sec: number
+          type: string | null
+        }
+        Insert: {
+          confidence?: number | null
+          id?: string
+          project_id: string
+          reason?: string | null
+          timestamp_sec: number
+          type?: string | null
+        }
+        Update: {
+          confidence?: number | null
+          id?: string
+          project_id?: string
+          reason?: string | null
+          timestamp_sec?: number
+          type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "breakpoints_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      exports: {
+        Row: {
+          created_at: string
+          file_url: string | null
+          id: string
+          project_id: string
+          type: Database["public"]["Enums"]["export_type"]
+        }
+        Insert: {
+          created_at?: string
+          file_url?: string | null
+          id?: string
+          project_id: string
+          type: Database["public"]["Enums"]["export_type"]
+        }
+        Update: {
+          created_at?: string
+          file_url?: string | null
+          id?: string
+          project_id?: string
+          type?: Database["public"]["Enums"]["export_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      highlights: {
+        Row: {
+          clip_url: string | null
+          end_sec: number
+          id: string
+          project_id: string
+          rank_order: number | null
+          reason: string | null
+          score: number | null
+          start_sec: number
+        }
+        Insert: {
+          clip_url?: string | null
+          end_sec: number
+          id?: string
+          project_id: string
+          rank_order?: number | null
+          reason?: string | null
+          score?: number | null
+          start_sec: number
+        }
+        Update: {
+          clip_url?: string | null
+          end_sec?: number
+          id?: string
+          project_id?: string
+          rank_order?: number | null
+          reason?: string | null
+          score?: number | null
+          start_sec?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "highlights_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      projects: {
+        Row: {
+          created_at: string
+          id: string
+          status: Database["public"]["Enums"]["project_status"]
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["project_status"]
+          title: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          status?: Database["public"]["Enums"]["project_status"]
+          title?: string
+        }
+        Relationships: []
+      }
+      segments: {
+        Row: {
+          confidence: number | null
+          end_sec: number
+          id: string
+          project_id: string
+          start_sec: number
+          summary: string | null
+          type: Database["public"]["Enums"]["segment_type"]
+        }
+        Insert: {
+          confidence?: number | null
+          end_sec: number
+          id?: string
+          project_id: string
+          start_sec: number
+          summary?: string | null
+          type: Database["public"]["Enums"]["segment_type"]
+        }
+        Update: {
+          confidence?: number | null
+          end_sec?: number
+          id?: string
+          project_id?: string
+          start_sec?: number
+          summary?: string | null
+          type?: Database["public"]["Enums"]["segment_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "segments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      videos: {
+        Row: {
+          duration_sec: number | null
+          id: string
+          original_filename: string
+          project_id: string
+          s3_uri: string | null
+        }
+        Insert: {
+          duration_sec?: number | null
+          id?: string
+          original_filename: string
+          project_id: string
+          s3_uri?: string | null
+        }
+        Update: {
+          duration_sec?: number | null
+          id?: string
+          original_filename?: string
+          project_id?: string
+          s3_uri?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "videos_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +221,14 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      export_type: "json" | "reel"
+      project_status: "draft" | "uploaded" | "analyzing" | "ready" | "failed"
+      segment_type:
+        | "opening"
+        | "climax"
+        | "story_unit"
+        | "transition"
+        | "resolution"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +355,16 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      export_type: ["json", "reel"],
+      project_status: ["draft", "uploaded", "analyzing", "ready", "failed"],
+      segment_type: [
+        "opening",
+        "climax",
+        "story_unit",
+        "transition",
+        "resolution",
+      ],
+    },
   },
 } as const
