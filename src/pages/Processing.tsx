@@ -139,7 +139,7 @@ const Processing = () => {
     setError(null);
     setChunkProgress(null);
     triggeredAnalyze.current = false;
-    triggeredReel.current = false;
+    
     await supabase.from("projects").update({ status: "uploaded" as any }).eq("id", projectId);
     setStatus("uploaded");
     setRetrying(false);
