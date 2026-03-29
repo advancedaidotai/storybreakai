@@ -874,6 +874,22 @@ const Results = () => {
 
   if (!projectId) return <DemoResults />;
 
+  if (fetchError && !loading && segments.length === 0 && breakpoints.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center px-6 py-20 max-w-xl mx-auto animate-fade-in">
+        <div className="glass-panel rounded-2xl p-6 text-center">
+          <AlertCircle className="h-8 w-8 text-destructive mx-auto mb-3" />
+          <h2 className="text-lg font-bold text-foreground mb-2">Unable to Load Results</h2>
+          <p className="text-sm text-muted-foreground mb-4">{fetchError}</p>
+          <div className="flex gap-2 justify-center">
+            <Button variant="ghost" size="sm" className="text-xs" onClick={() => navigate("/")}>← New Analysis</Button>
+            <Button size="sm" className="text-xs" onClick={() => window.location.reload()}>Retry</Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col px-4 py-4 max-w-[1400px] mx-auto gap-4 animate-fade-in">
