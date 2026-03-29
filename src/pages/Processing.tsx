@@ -263,9 +263,21 @@ const Processing = () => {
 
       {/* Timeout warnings */}
       {elapsedSec >= 600 && !isFailed && (
-        <div className="w-full max-w-sm mt-4 p-3 rounded-xl border border-destructive/30 bg-destructive/10 text-sm text-destructive flex items-start gap-2">
-          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-          <span>Analysis may have stalled. Try refreshing or starting over.</span>
+        <div className="w-full max-w-sm mt-4 p-3 rounded-xl border border-destructive/30 bg-destructive/10 text-sm text-destructive flex flex-col gap-2">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+            <span>Analysis may have stalled. Try retrying or starting over.</span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-xs h-8 rounded-lg gap-2 border-destructive/30 hover:bg-destructive/10 text-destructive w-fit"
+            onClick={handleRetry}
+            disabled={retrying}
+          >
+            <RefreshCw className={`h-3 w-3 ${retrying ? "animate-spin" : ""}`} />
+            {retrying ? "Restarting…" : "Retry Analysis"}
+          </Button>
         </div>
       )}
       {elapsedSec >= 300 && elapsedSec < 600 && !isFailed && (
