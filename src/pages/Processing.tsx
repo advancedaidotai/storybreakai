@@ -8,10 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 type ProjectStatus = "draft" | "uploaded" | "analyzing" | "segments_done" | "highlights_done" | "generating_reel" | "ready" | "complete" | "failed";
 
 const STEPS = [
-  { key: "uploaded", label: "Uploaded to Cloud", icon: CloudUpload },
-  { key: "analyzing", label: "Analyzing with AI", icon: Brain },
-  { key: "segments_done", label: "Detecting Segments", icon: Layers },
-  { key: "highlights_done", label: "Identifying Highlights", icon: Sparkles },
+  { key: "uploaded", label: "Getting your video ready...", icon: CloudUpload },
+  { key: "analyzing", label: "Finding the story beats...", icon: Brain },
+  { key: "segments_done", label: "Mapping scene boundaries...", icon: Layers },
+  { key: "highlights_done", label: "Spotting the best moments...", icon: Sparkles },
 ] as const;
 
 function statusToStepIndex(status: ProjectStatus): number {
