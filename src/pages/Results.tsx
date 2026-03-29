@@ -519,6 +519,7 @@ function Timeline({
                   <p className="font-semibold" style={{ color: "#8B5CF6" }}>Highlight #{hl.rank_order ?? "—"}</p>
                   <p className="text-muted-foreground font-mono">{formatTime(hl.start_sec)} → {formatTime(hl.end_sec)}</p>
                   <p className="text-muted-foreground">Score: {hl.score ?? "—"}</p>
+                  {hl.reason && <p className="text-muted-foreground mt-1 line-clamp-2">Selected for: {hl.reason}</p>}
                 </div>
               }>
                 <div className={`absolute top-0 cursor-pointer transition-all duration-200 hover:scale-150 ${isSelected ? "scale-150 drop-shadow-[0_0_6px_#8B5CF6]" : ""}`} style={{ left: `${left}%`, transform: "translateX(-50%)" }} onClick={() => onSelectHighlight(hl)}>
