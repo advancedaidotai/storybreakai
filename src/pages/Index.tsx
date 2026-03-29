@@ -1,5 +1,6 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useRef, useCallback, useEffect } from "react";
+import RecentProjects from "@/components/RecentProjects";
 import { CloudUpload, Film, AlertCircle, X, Loader2, Tv, Clapperboard, XCircle, Check, Sparkles, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -642,6 +643,9 @@ const Index = () => {
           </div>
         </div>
       </div>
+
+      {/* Recent Projects */}
+      <RecentProjects />
     </div>
   );
 };

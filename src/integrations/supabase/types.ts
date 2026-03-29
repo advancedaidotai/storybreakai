@@ -350,6 +350,7 @@ export type Database = {
         | "complete"
         | "segments_done"
         | "highlights_done"
+        | "archived"
       segment_type:
         | "opening"
         | "climax"
@@ -504,6 +505,7 @@ export const Constants = {
         "complete",
         "segments_done",
         "highlights_done",
+        "archived",
       ],
       segment_type: [
         "opening",
