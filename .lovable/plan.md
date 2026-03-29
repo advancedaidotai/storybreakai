@@ -1,36 +1,39 @@
 
 
-## NLE Integration: Add FCP XML and AAF-Compatible XML Exports
+## Plan: Block Unsupported Codec Uploads with Friendly Error
 
 ### What Changes
-Expand the existing export system to include two additional industry-standard NLE formats alongside the current CMX 3600 EDL:
-- **Final Cut Pro XML (FCPXML)** — native import for FCP and DaVinci Resolve
-- **Adobe Premiere XML** — compatible with Premiere Pro, Avid via AAF-equivalent XML interchange
 
-The "Get EDL + OTT Package" button becomes a dropdown/expanded export section offering all formats.
+Currently, when a video with an unsupported codec is selected, the UI shows an amber **warning** banner but still allows the user to proceed with upload. This leads to a guaranteed 500/422 failure from the AI model later. The fix will upgrade the codec check from a dismissible warning to a **blocking error** that disables the upload button.
 
-### Implementation
+### Implementation (single file: `src/pages/Index.tsx`)
 
-**File: `src/pages/Results.tsx`**
+**1. Add a new state flag: `codecBlocked`**
+- `const [codecBlocked, setCodecBlocked] = useState(false);`
+- Set to `true` when `videoWidth === 0 && videoHeight === 0` (confirmed unsupported codec) or when `video.onerror` fires
+- Set to `false` on new file selection or file removal
+- Reset alongside `codecWarning` in all existing clear points
 
-1. **Add two generator functions** next to existing `generateEDL` and `generateOTTManifest`:
-   - `generateFCPXML(breakpoints, segments, title, durationSec)` — produces FCPXML v1.9 with markers at each breakpoint timecode, segment clips as storyline items, and proper `<fcpxml>` root structure
-   - `generatePremiereXML(breakpoints, segments, title, durationSec)` — produces Premiere-compatible XML (xmeml format) with a sequence containing markers at breakpoint positions
+**2. Update `checkCodecSupport` callback**
+- In the `onloadedmetadata` handler: when dimensions are `0x0`, also call `setCodecBlocked(true)` and change the message to a firm error tone: *"This video uses an unsupported codec. StoryBreak AI requires H.264 (AVC) video in an MP4 container. Please re-encode your video and try again."*
+- In the `onerror` handler: also call `setCodecBlocked(true)` with message: *"We couldn't read this video. The file may be corrupt or use an unsupported format. Please use an H.264/MP4 file."*
+- For the softer MIME/extension mismatch case (lines 404-411), keep it as a non-blocking warning (no change)
 
-2. **Update the `handleDownloadMasterPackage` callback** to download all four files (EDL, OTT JSON, FCPXML, Premiere XML) sequentially with 300ms delays between each.
+**3. Gate the upload button on `codecBlocked`**
+- Change `disabled={!formValid || isBusy}` to `disabled={!formValid || isBusy || codecBlocked}`
+- Update the gradient condition similarly
 
-3. **Update the DetailPanel export section**:
-   - Rename button label from "Get EDL + OTT Package" to "Download NLE Package"
-   - Add individual export buttons for each format: EDL, FCP XML, Premiere XML, OTT JSON
-   - Group under a collapsible "Individual Formats" sub-section so the UI stays clean
+**4. Change the warning banner to an error banner when blocked**
+- When `codecBlocked` is true, render the banner with red/destructive styling (`bg-red-500/10 border-red-500/25 text-red-400`) instead of amber, with title "Unsupported Video Format" and an `XCircle` icon
+- When `codecBlocked` is false but `codecWarning` exists, keep current amber warning style
+- Remove the dismiss `X` button when `codecBlocked` — user must pick a different file instead
 
-4. **Update `ReadinessInfo`** to add an `fcpxml` readiness state (same logic as `edl` — ready when breakpoints exist).
-
-5. **Update readiness indicator list** to show "FCP XML" and "Premiere XML" alongside existing EDL/OTT entries.
+**5. Update the tooltip on disabled button**
+- When `codecBlocked`, show: *"This video format is not supported — please select a different file"*
 
 ### Technical Detail
-- FCPXML uses DTD v1.9 with `<asset-clip>` and `<marker>` elements; timecodes expressed as rational frames (e.g., `"86400/24s"`)
-- Premiere XML uses the `xmeml` format with `<sequence>` containing `<marker>` nodes — this is the standard interchange format that both Premiere and Avid can import
-- No new dependencies, files, or database changes needed — pure client-side string generation
-- All formats use the same breakpoint/segment data already fetched
+- No new dependencies or files
+- No backend changes
+- `codecBlocked` resets on `handleFileSelect` and the remove-file button click, so selecting a valid file immediately unblocks
+- The non-blocking amber warning for edge-case MIME mismatches remains as-is for `.mov` and similar files that may still work
 
