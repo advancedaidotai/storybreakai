@@ -1,8 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useRef, useCallback } from "react";
-import { CloudUpload, Play, Film, AlertCircle, X, Loader2 } from "lucide-react";
+import { CloudUpload, Play, Film, AlertCircle, X, Loader2, Tv, Radio, Clapperboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 
 const ACCEPTED_TYPES = ["video/mp4", "video/quicktime"];
