@@ -197,9 +197,9 @@ const Processing = () => {
                 }`}>{step.label}</p>
 
                 {isActive && !isError && (
-                  <p className="text-xs text-primary/70 mt-0.5 font-medium tracking-wide uppercase">In progress…</p>
+                  <p className="text-xs text-primary/70 mt-0.5 font-medium tracking-wide">Hang tight, almost there…</p>
                 )}
-                {isDone && <p className="text-xs text-segment/70 mt-0.5">Complete</p>}
+                {isDone && <p className="text-xs text-segment/70 mt-0.5">Done ✓</p>}
 
                 {/* Chunk sub-progress for the "Analyzing with AI" step */}
                 {isActive && !isError && step.key === "analyzing" && chunkProgress && chunkProgress.total > 1 && (
