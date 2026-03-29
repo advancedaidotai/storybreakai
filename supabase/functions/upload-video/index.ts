@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { filename, content_type, file_size, duration_sec, is_sample, s3_uri_override, delivery_target } = await req.json();
+    const { filename, content_type, file_size, duration_sec, is_sample, s3_uri_override, delivery_target, content_type_enum, content_metadata } = await req.json();
 
     // Validate input
     if (!filename || typeof filename !== "string") {
