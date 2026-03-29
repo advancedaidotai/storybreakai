@@ -767,7 +767,7 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, readines
         </div>
         {readiness.analysis === "failed" && (
           <Button variant="outline" size="sm" className="w-full mt-3 gap-2 rounded-xl text-xs h-7 border-destructive/30 text-destructive hover:bg-destructive/10" onClick={onRetry}>
-            <AlertCircle className="h-3 w-3" /> Retry Analysis
+            <AlertCircle className="h-3 w-3" /> Try Again
           </Button>
         )}
       </div>
