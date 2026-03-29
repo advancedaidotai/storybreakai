@@ -58,6 +58,7 @@ const Index = () => {
           duration_sec: 600,
           is_sample: true,
           s3_uri_override: "s3://storybreak-ai-videos/samples/sample-video.mp4",
+          delivery_target: deliveryTarget,
         },
       });
       if (fnError || !data?.project_id) {

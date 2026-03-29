@@ -55,7 +55,7 @@ async function signedBedrockRequest(params: {
   const canonicalRequest = [
     "POST",
     path,
-    "", // no query string
+    "",
     canonicalHeaders,
     signedHeaders,
     payloadHash,
@@ -90,10 +90,18 @@ async function signedBedrockRequest(params: {
   });
 }
 
+// ─── Delivery target labels ─────────────────────────────────────────────────
+
+const DELIVERY_LABELS: Record<string, string> = {
+  youtube: "YouTube (3-5 minute ad-break intervals)",
+  cable_vod: "Cable/VOD (8-12 minute ad-break intervals)",
+  broadcast: "Broadcast/Master (act structure breaks)",
+};
+
 // ─── JSON validation ─────────────────────────────────────────────────────────
 
 const SEGMENT_TYPES = ["opening", "climax", "story_unit", "transition", "resolution"];
-const BREAKPOINT_TYPES = ["natural_pause", "ad_break", "story_boundary"];
+const VALLEY_TYPES = ["dialogue_pause", "topic_shift", "emotional_resolution", "scene_transition"];
 
 interface RawSegment {
   start_sec: number;
@@ -107,6 +115,10 @@ interface RawBreakpoint {
   type: string;
   reason?: string;
   confidence?: number;
+  lead_in_sec?: number;
+  valley_type?: string;
+  ad_slot_duration_rec?: number;
+  compliance_notes?: string;
 }
 interface RawHighlight {
   start_sec: number;
@@ -154,9 +166,13 @@ function validateAndClean(raw: unknown): AnalysisResult {
     }
     return {
       timestamp_sec: b.timestamp_sec,
-      type: BREAKPOINT_TYPES.includes(b.type) ? b.type : b.type || "natural_pause",
+      type: typeof b.type === "string" ? b.type : "natural_pause",
       reason: typeof b.reason === "string" ? b.reason : null,
       confidence: typeof b.confidence === "number" ? b.confidence : null,
+      lead_in_sec: typeof b.lead_in_sec === "number" ? b.lead_in_sec : null,
+      valley_type: VALLEY_TYPES.includes(b.valley_type) ? b.valley_type : null,
+      ad_slot_duration_rec: typeof b.ad_slot_duration_rec === "number" ? b.ad_slot_duration_rec : null,
+      compliance_notes: typeof b.compliance_notes === "string" ? b.compliance_notes : null,
     };
   });
 
@@ -179,18 +195,15 @@ function validateAndClean(raw: unknown): AnalysisResult {
 // ─── Extract JSON from possibly-wrapped response ────────────────────────────
 
 function extractJSON(text: string): unknown {
-  // Try direct parse first
   try {
     return JSON.parse(text);
   } catch { /* continue */ }
 
-  // Try to find JSON in markdown code blocks
   const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
   if (codeBlockMatch) {
     return JSON.parse(codeBlockMatch[1].trim());
   }
 
-  // Try to find first { ... } block
   const braceMatch = text.match(/\{[\s\S]*\}/);
   if (braceMatch) {
     return JSON.parse(braceMatch[0]);
@@ -238,10 +251,20 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Fetch project to get delivery_target
+    const { data: project } = await supabase
+      .from("projects")
+      .select("delivery_target")
+      .eq("id", projectId)
+      .single();
+
+    const deliveryTarget = project?.delivery_target || "youtube";
+    const deliveryLabel = DELIVERY_LABELS[deliveryTarget] || DELIVERY_LABELS.youtube;
+
     // 2) Update status to analyzing
     await supabase.from("projects").update({ status: "analyzing" }).eq("id", projectId);
 
-    // 3) Call Bedrock
+    // 3) Call Bedrock with ad-break intelligence prompt
     const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY");
     const awsSecretKey = Deno.env.get("AWS_SECRET_KEY");
     const bedrockRegion = Deno.env.get("BEDROCK_REGION") || "us-east-1";
@@ -250,7 +273,7 @@ Deno.serve(async (req) => {
       throw new Error("AWS credentials not configured");
     }
 
-    const prompt = `You are an expert video editor AI. Analyze the video at this URI: ${video.s3_uri}. Return ONLY valid JSON with: segments (4-8, types: opening/story_unit/transition/climax/resolution, never cut mid-sentence), breakpoints (3-7, types: natural_pause/ad_break/story_boundary), highlights (top 5-10 scored by semantic_importance + emotional_intensity + transition_strength + pacing_shift + usability). All times in seconds. Return ONLY the JSON object.`;
+    const prompt = `You are an expert video editor AI specializing in ad-break placement. Analyze the video at ${video.s3_uri} for ${deliveryLabel} format. Identify 5-7 optimal ad-break positions by finding Semantic Narrative Valleys - natural pauses in dialogue/action, topic shifts, or emotional resolutions where an ad break feels organic. Rule: Never cut mid-sentence or mid-action. For each breakpoint return: timestamp_sec, lead_in_sec (frame before break), valley_type (dialogue_pause/topic_shift/emotional_resolution/scene_transition), reason, confidence, ad_slot_duration_rec (seconds), compliance_notes. Also return segments (4-8, types: opening/story_unit/transition/climax/resolution with start_sec, end_sec, type, summary, confidence) and highlights (top 5-10 scored by semantic_importance + emotional_intensity + transition_strength + pacing_shift + usability with start_sec, end_sec, score, reason, rank_order). All times in seconds. Return ONLY valid JSON.`;
 
     const bedrockBody = {
       inputText: prompt,
@@ -261,7 +284,7 @@ Deno.serve(async (req) => {
       },
     };
 
-    console.log(`[analyze-video] Calling Bedrock for project ${projectId}`);
+    console.log(`[analyze-video] Calling Bedrock for project ${projectId} (target: ${deliveryTarget})`);
 
     const bedrockResp = await signedBedrockRequest({
       region: bedrockRegion,
@@ -279,7 +302,6 @@ Deno.serve(async (req) => {
 
     const bedrockData = await bedrockResp.json();
 
-    // Extract text from Bedrock response (format varies by model)
     let responseText: string;
     if (bedrockData?.results?.[0]?.outputText) {
       responseText = bedrockData.results[0].outputText;
@@ -324,6 +346,10 @@ Deno.serve(async (req) => {
         type: b.type,
         reason: b.reason,
         confidence: b.confidence,
+        lead_in_sec: b.lead_in_sec,
+        valley_type: b.valley_type,
+        ad_slot_duration_rec: b.ad_slot_duration_rec,
+        compliance_notes: b.compliance_notes,
       }))
     );
     if (bpErr) {
@@ -346,8 +372,9 @@ Deno.serve(async (req) => {
       throw new Error(`Failed to insert highlights: ${hlErr.message}`);
     }
 
-    // 6) Update status to ready
-    await supabase.from("projects").update({ status: "ready" }).eq("id", projectId);
+    // 6) Update status progression
+    await supabase.from("projects").update({ status: "segments_done" }).eq("id", projectId);
+    await supabase.from("projects").update({ status: "highlights_done" }).eq("id", projectId);
 
     console.log(`[analyze-video] Project ${projectId} analysis complete`);
 
@@ -364,7 +391,6 @@ Deno.serve(async (req) => {
   } catch (err: any) {
     console.error(`[analyze-video] Error for project ${projectId}:`, err.message);
 
-    // Mark project as failed
     if (projectId) {
       await supabase.from("projects").update({ status: "failed" }).eq("id", projectId).catch(() => {});
     }
