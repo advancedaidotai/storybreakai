@@ -930,6 +930,25 @@ const Results = () => {
     }, 300);
   }, [breakpoints, projectInfo, projectId]);
 
+  // Compute readiness states from loaded data
+  const readiness = useMemo<ReadinessInfo>(() => {
+    const hasSegments = segments.length > 0;
+    const hasBreakpoints = breakpoints.length > 0;
+    const analysisOk = hasSegments || hasBreakpoints;
+
+    return {
+      analysis: fetchError && !analysisOk ? "failed" : analysisOk ? "ready" : "unavailable",
+      edl: hasBreakpoints ? "ready" : analysisOk ? "unavailable" : "unavailable",
+      ottJson: hasBreakpoints ? "ready" : analysisOk ? "unavailable" : "unavailable",
+      highlightReel: "unavailable" as const, // reel generation disabled for stability
+    };
+  }, [segments, breakpoints, fetchError]);
+
+  const handleRetryAnalysis = useCallback(() => {
+    if (!projectId) return;
+    navigate(`/processing/${projectId}`);
+  }, [projectId, navigate]);
+
   if (!projectId) return <DemoResults />;
 
   if (fetchError && !loading && segments.length === 0 && breakpoints.length === 0) {
