@@ -864,7 +864,7 @@ const Results = () => {
       {/* Breakpoint Storyboard */}
       {breakpoints.length > 0 && (
         <div className="fade-in-600 fade-in-delay-2">
-          <BreakpointStoryboard breakpoints={breakpoints} selected={selected} onCardClick={handleBreakpointCardClick} />
+          <BreakpointStoryboard breakpoints={breakpoints} selected={selected} currentTime={currentTime} onCardClick={handleBreakpointCardClick} />
         </div>
       )}
 
