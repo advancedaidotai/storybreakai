@@ -152,6 +152,7 @@ const Index = () => {
   const [urlValidating, setUrlValidating] = useState(false);
   const [urlValid, setUrlValid] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
+  const [codecWarning, setCodecWarning] = useState<string | null>(null);
 
   const config = CONTENT_CONFIGS[contentType];
 
@@ -381,13 +382,57 @@ const Index = () => {
     }
   }, [selectedFile, formValid, config, contentType, filmTitle, studio, showTitle, season, episodeNum, episodeTitle, tvStudio, deliveryTarget, navigate, uploadMultipart, uploadSinglePut, videoSourceMode, videoUrl]);
 
+  const checkCodecSupport = useCallback((file: File) => {
+    setCodecWarning(null);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    const blobUrl = URL.createObjectURL(file);
+
+    const cleanup = () => { URL.revokeObjectURL(blobUrl); };
+
+    video.onloadedmetadata = () => {
+      // If the browser can't decode the codec, dimensions will be 0
+      if (video.videoWidth === 0 && video.videoHeight === 0) {
+        setCodecWarning(
+          "This video may use an unsupported codec (e.g. HEVC/H.265, VP9, or AV1). Our AI model requires H.264/AVC in an MP4 container. Analysis will likely fail — please re-encode with H.264 if possible."
+        );
+        cleanup();
+        return;
+      }
+      // Additional check: see if the browser reports the MIME as playable
+      const mime = file.type || "video/mp4";
+      if (typeof MediaSource !== "undefined" && !MediaSource.isTypeSupported(mime)) {
+        // Not all browsers flag this, so only warn — don't block
+        const ext = file.name.split(".").pop()?.toLowerCase();
+        if (ext !== "mp4" && ext !== "mov") {
+          setCodecWarning(
+            `The format "${ext}" may not be compatible with our AI model. For best results, use H.264-encoded MP4 files.`
+          );
+        }
+      }
+      cleanup();
+    };
+
+    video.onerror = () => {
+      setCodecWarning(
+        "We couldn't read this video's codec information. It may use an unsupported format. For reliable analysis, use H.264/AVC in an MP4 container."
+      );
+      cleanup();
+    };
+
+    video.src = blobUrl;
+  }, []);
+
   const handleFileSelect = useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setSelectedFile(files[0]);
-    setFileName(files[0].name);
-    setFileSize(files[0].size);
+    const file = files[0];
+    setSelectedFile(file);
+    setFileName(file.name);
+    setFileSize(file.size);
     setError(null);
-  }, []);
+    setCodecWarning(null);
+    checkCodecSupport(file);
+  }, [checkCodecSupport]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); }, []);
   const handleDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(false); }, []);
@@ -759,7 +804,7 @@ const Index = () => {
                           <p className="text-xs text-muted-foreground">{formatSize(selectedFile.size)}</p>
                         </div>
                         <button
-                          onClick={(e) => { e.stopPropagation(); setSelectedFile(null); setFileName(""); setFileSize(0); }}
+                          onClick={(e) => { e.stopPropagation(); setSelectedFile(null); setFileName(""); setFileSize(0); setCodecWarning(null); }}
                           className="shrink-0 h-8 w-8 rounded-lg bg-surface-2/60 flex items-center justify-center hover:bg-destructive/20 hover:text-destructive transition-colors"
                         >
                           <X className="h-3.5 w-3.5" />
@@ -791,6 +836,18 @@ const Index = () => {
                 </div>
               )}
             </div>
+
+            {/* Codec warning */}
+            {codecWarning && !error && (
+              <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-400">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-xs font-semibold mb-0.5">Codec Compatibility Warning</p>
+                  <p className="text-[11px] leading-relaxed opacity-80">{codecWarning}</p>
+                </div>
+                <button onClick={() => setCodecWarning(null)} className="shrink-0 hover:opacity-70 transition-opacity"><X className="h-3.5 w-3.5" /></button>
+              </div>
+            )}
 
             {/* Error */}
             {error && (
