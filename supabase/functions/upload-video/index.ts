@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { filename, content_type, file_size, duration_sec, is_sample, s3_uri_override, delivery_target } = await req.json();
+    const { filename, content_type, file_size, duration_sec, is_sample, s3_uri_override, delivery_target, content_type_enum, content_metadata } = await req.json();
 
     // Validate input
     if (!filename || typeof filename !== "string") {
@@ -132,7 +132,15 @@ Deno.serve(async (req) => {
     // Create project
     const { data: project, error: projErr } = await supabase
       .from("projects")
-      .insert({ title, status: "uploaded", delivery_target: delivery_target || null })
+      .insert({
+        title,
+        status: "uploaded",
+        delivery_target: delivery_target || null,
+        content_type: content_type_enum || "short_form",
+        content_metadata: content_metadata || null,
+        duration_sec: duration_sec ?? null,
+        file_size_bytes: file_size ?? null,
+      })
       .select("id")
       .single();
 
