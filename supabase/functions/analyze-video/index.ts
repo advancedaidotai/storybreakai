@@ -272,18 +272,35 @@ async function callPegasus(prompt: string, projectId: string): Promise<{ result:
   const awsSecretKey = Deno.env.get("AWS_SECRET_KEY")!;
   const bedrockRegion = Deno.env.get("BEDROCK_REGION") || "us-east-1";
 
-  const bedrockResp = await signedBedrockRequest({
-    region: bedrockRegion, accessKey: awsAccessKey, secretKey: awsSecretKey,
-    modelId: "twelvelabs.pegasus-1-2-v1:0",
-    body: { inputText: prompt, textGenerationConfig: { maxTokenCount: 8192, temperature: 0.2, topP: 0.9 } },
+  const bedrockClient = new BedrockRuntimeClient({
+    region: bedrockRegion,
+    credentials: {
+      accessKeyId: awsAccessKey,
+      secretAccessKey: awsSecretKey,
+    },
   });
 
-  if (!bedrockResp.ok) {
-    const errText = await bedrockResp.text();
-    throw new Error(`Bedrock API error (${bedrockResp.status}): ${errText.slice(0, 500)}`);
+  let bedrockData: any;
+  try {
+    const command = new InvokeModelCommand({
+      modelId: "twelvelabs.pegasus-1-2-v1:0",
+      contentType: "application/json",
+      accept: "application/json",
+      body: new TextEncoder().encode(
+        JSON.stringify({
+          inputText: prompt,
+          textGenerationConfig: { maxTokenCount: 8192, temperature: 0.2, topP: 0.9 },
+        }),
+      ),
+    });
+
+    const response = await bedrockClient.send(command);
+    const responseBody = new TextDecoder().decode(response.body);
+    bedrockData = JSON.parse(responseBody);
+  } catch (err: any) {
+    throw new Error(`Bedrock SDK invoke failed: ${err?.message || "Unknown Bedrock error"}`);
   }
 
-  const bedrockData = await bedrockResp.json();
   let responseText: string;
   if (bedrockData?.results?.[0]?.outputText) responseText = bedrockData.results[0].outputText;
   else if (bedrockData?.output?.text) responseText = bedrockData.output.text;
