@@ -735,6 +735,17 @@ const Results = () => {
   const { projectId } = useParams<{ projectId: string }>();
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  const [currentTime, setCurrentTime] = useState(0);
+
+  // Track video playback position
+  useEffect(() => {
+    const vid = videoRef.current;
+    if (!vid) return;
+    const onTime = () => setCurrentTime(vid.currentTime);
+    vid.addEventListener("timeupdate", onTime);
+    return () => vid.removeEventListener("timeupdate", onTime);
+  }, [videoUrl]);
+
   const [loading, setLoading] = useState(true);
   const [segments, setSegments] = useState<Segment[]>([]);
   const [breakpoints, setBreakpoints] = useState<Breakpoint[]>([]);
