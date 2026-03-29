@@ -53,7 +53,7 @@ async function signedBedrockRequest(params: {
   const { region, accessKey, secretKey, modelId, body } = params;
   const service = "bedrock";
   const host = `bedrock-runtime.${region}.amazonaws.com`;
-  const path = `/model/${encodeURIComponent(modelId)}/invoke`;
+  const path = `/model/${modelId}/invoke`;
   const url = `https://${host}${path}`;
   const payload = JSON.stringify(body);
   const payloadBytes = new TextEncoder().encode(payload);
@@ -571,7 +571,8 @@ Deno.serve(async (req) => {
   } catch (err: any) {
     console.error(`[analyze-video] Error for project ${projectId}:`, err.message);
     if (projectId) {
-      await supabase.from("projects").update({ status: "failed" }).eq("id", projectId).catch(() => {});
+      const { error: failErr } = await supabase.from("projects").update({ status: "failed" }).eq("id", projectId);
+      if (failErr) console.error("[analyze-video] Failed to set project failed status:", failErr.message);
     }
     return new Response(JSON.stringify({ error: err.message || "Analysis failed" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
