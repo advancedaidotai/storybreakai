@@ -961,6 +961,18 @@ const Results = () => {
   const [chunks, setChunks] = useState<AnalysisChunk[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
 
+  // Re-Analyze modal state
+  const [reAnalyzeOpen, setReAnalyzeOpen] = useState(false);
+  const [reDeliveryTarget, setReDeliveryTarget] = useState("");
+  const [reContentType, setReContentType] = useState("");
+  const [reAnalyzing, setReAnalyzing] = useState(false);
+
+  // Sync modal defaults when project loads
+  useEffect(() => {
+    setReDeliveryTarget(projectInfo.delivery_target || "ott");
+    setReContentType(projectInfo.content_type || "short_form");
+  }, [projectInfo.delivery_target, projectInfo.content_type]);
+
   // Track video playback position
   useEffect(() => {
     const vid = videoRef.current;
