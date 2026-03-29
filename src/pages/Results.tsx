@@ -789,7 +789,78 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, readines
 }
 
 function SegmentDetail({ seg }: { seg: Segment }) {
-  return (<div className="space-y-2.5 text-xs"><Row label="Type" value={seg.type.replace("_", " ")} /><Row label="Time" value={`${formatTime(seg.start_sec)} → ${formatTime(seg.end_sec)}`} mono /><ConfidenceRow value={seg.confidence} />{seg.summary && <ReasonBox title="AI Summary" text={seg.summary} />}</div>);
+  const [showSimilar, setShowSimilar] = useState(false);
+  const [similarLoading, setSimilarLoading] = useState(false);
+  const [similarResults, setSimilarResults] = useState<{ label: string; timestamp: number; score: number; reason: string }[] | null>(null);
+
+  const handleFindSimilar = () => {
+    setShowSimilar(true);
+    setSimilarLoading(true);
+    setSimilarResults(null);
+    // Simulate search with 1.5s delay
+    setTimeout(() => {
+      const dur = seg.end_sec - seg.start_sec;
+      const mockResults = [
+        { label: `${seg.type.replace("_", " ")} at ${formatTime(seg.start_sec + dur * 3)}`, timestamp: seg.start_sec + dur * 3, score: 92, reason: "Similar pacing and emotional tone" },
+        { label: `${seg.type.replace("_", " ")} at ${formatTime(seg.start_sec + dur * 7)}`, timestamp: seg.start_sec + dur * 7, score: 87, reason: "Matching visual composition and dialogue density" },
+        { label: `${seg.type.replace("_", " ")} at ${formatTime(seg.start_sec + dur * 12)}`, timestamp: seg.start_sec + dur * 12, score: 81, reason: "Similar narrative arc structure" },
+        { label: `Transition at ${formatTime(seg.end_sec + 120)}`, timestamp: seg.end_sec + 120, score: 74, reason: "Comparable scene transition energy" },
+      ];
+      setSimilarResults(mockResults);
+      setSimilarLoading(false);
+    }, 1500);
+  };
+
+  return (
+    <div className="space-y-2.5 text-xs">
+      <Row label="Type" value={seg.type.replace("_", " ")} />
+      <Row label="Time" value={`${formatTime(seg.start_sec)} → ${formatTime(seg.end_sec)}`} mono />
+      <ConfidenceRow value={seg.confidence} />
+      {seg.summary && <ReasonBox title="AI Summary" text={seg.summary} />}
+      <Button variant="outline" size="sm" className="w-full gap-2 rounded-xl text-[10px] h-7 border-highlight/30 text-highlight hover:bg-highlight/10 mt-2" onClick={handleFindSimilar}>
+        <Sparkles className="h-3 w-3" /> Find Similar Moments
+      </Button>
+
+      {showSimilar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in" onClick={() => setShowSimilar(false)}>
+          <div className="glass-panel-elevated rounded-2xl p-5 w-[340px] max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-bold text-foreground">Similar Moments</h3>
+              <button onClick={() => setShowSimilar(false)} className="h-6 w-6 rounded-lg bg-surface-2/60 flex items-center justify-center hover:bg-destructive/20 transition-colors">
+                <span className="text-xs text-muted-foreground">✕</span>
+              </button>
+            </div>
+            {similarLoading ? (
+              <div className="flex flex-col items-center py-8 gap-3">
+                <Loader2 className="h-6 w-6 text-primary animate-spin" />
+                <p className="text-xs text-muted-foreground">Searching for similar moments…</p>
+              </div>
+            ) : similarResults ? (
+              <div className="space-y-2">
+                {similarResults.map((r, i) => (
+                  <button
+                    key={i}
+                    className="w-full text-left p-3 rounded-xl hover:bg-surface-1/60 transition-colors border border-border/15"
+                    onClick={() => {
+                      const vid = document.querySelector("video");
+                      if (vid) { vid.currentTime = r.timestamp; vid.play().catch(() => {}); }
+                      setShowSimilar(false);
+                    }}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[11px] font-semibold text-foreground capitalize">{r.label}</span>
+                      <span className="text-[10px] font-bold text-highlight">{r.score}%</span>
+                    </div>
+                    <p className="text-[10px] text-muted-foreground">{r.reason}</p>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function BreakpointDetail({ bp }: { bp: Breakpoint }) {
