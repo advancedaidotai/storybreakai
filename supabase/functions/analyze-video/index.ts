@@ -676,8 +676,10 @@ Deno.serve(async (req) => {
     let durationSec = project?.duration_sec || video.duration_sec || 0;
     const durationUnknown = !durationSec || durationSec <= 0;
     if (durationUnknown) {
-      console.warn(`[analyze-video] duration_sec is 0 or missing for project ${projectId}, will auto-detect after analysis`);
-      durationSec = 3600; // temporary default for chunking logic; will be corrected post-analysis
+      console.warn(`[analyze-video] duration_sec is 0 or missing for project ${projectId}, defaulting to multi-pass safe value`);
+      // Default to a value that forces multi-pass, since we don't know the real length
+      // and sending a very long video single-pass causes "Unprocessable video" errors
+      durationSec = MAX_SINGLE_PASS + 1;
     }
 
     if (!Deno.env.get("AWS_ACCESS_KEY") || !Deno.env.get("AWS_SECRET_KEY")) throw new Error("AWS credentials not configured");
