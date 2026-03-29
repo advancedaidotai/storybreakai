@@ -777,10 +777,10 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, readines
         <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">Get Your Results</h3>
         <div className="flex flex-col gap-2">
           <Button variant="outline" size="sm" className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover" onClick={onExportJSON} disabled={readiness.analysis !== "ready"}>
-            <FileJson className="h-3.5 w-3.5" /> Export JSON
+            <FileJson className="h-3.5 w-3.5" /> Export Full Analysis (JSON)
           </Button>
           <Button variant="outline" size="sm" className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover" onClick={onDownloadMasterPackage} disabled={readiness.edl !== "ready"}>
-            <Package className="h-3.5 w-3.5" /> Download Master Package
+            <Package className="h-3.5 w-3.5" /> Get EDL + OTT Package
           </Button>
         </div>
       </div>
