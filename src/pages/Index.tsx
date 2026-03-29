@@ -191,12 +191,15 @@ const Index = () => {
       setUrlError("Please enter a video URL");
       return;
     }
+    setUrlValidating(true);
+    setUrlError(null);
     if (!isValidVideoUrl(trimmed)) {
       setUrlError("That doesn't look like a valid video URL. Please check and try again.");
+      setUrlValidating(false);
       return;
     }
-    setUrlError(null);
     setUrlValid(true);
+    setUrlValidating(false);
     toast({ title: "Video URL accepted", description: "We'll verify access when analysis starts." });
   }, [videoUrl]);
 
