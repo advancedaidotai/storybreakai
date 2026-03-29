@@ -1,5 +1,6 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import { toast } from "@/hooks/use-toast";
 import {
   Play, Sparkles, Star, Download, FileJson, Zap, Loader2,
   MessageCircle, ArrowRightLeft, Heart, Film, Package,
@@ -59,8 +60,13 @@ function formatTime(sec: number): string {
 }
 
 function formatTimecode(sec: number, fps = 24): string {
-  const h = Math.floor(sec / 3600); const m = Math.floor((sec % 3600) / 60); const s = Math.floor(sec % 60); const f = Math.round((sec % 1) * fps);
+  const h = Math.floor(sec / 3600); const m = Math.floor((sec % 3600) / 60); const s = Math.floor(sec % 60); const f = Math.floor((sec % 1) * fps);
   return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}:${f.toString().padStart(2, "0")}`;
+}
+
+function formatTimeOffset(sec: number): string {
+  const h = Math.floor(sec / 3600); const m = Math.floor((sec % 3600) / 60); const s = Math.floor(sec % 60); const ms = Math.round((sec % 1) * 1000);
+  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}.${ms.toString().padStart(3, "0")}`;
 }
 
 function confidenceColor(c: number | null): string {
@@ -96,17 +102,41 @@ function generateEDL(breakpoints: Breakpoint[], title: string): string {
   const lines = ["TITLE: " + title, "FCM: NON-DROP FRAME", ""];
   breakpoints.forEach((bp, i) => {
     const eventNum = String(i + 1).padStart(3, "0");
-    const tc = formatTimecode(bp.timestamp_sec);
-    const leadIn = bp.lead_in_sec ? formatTimecode(bp.lead_in_sec) : formatTimecode(Math.max(0, bp.timestamp_sec - 2));
-    lines.push(`${eventNum}  001      V     C        ${leadIn} ${tc} ${leadIn} ${tc}`, `* VALLEY_TYPE: ${bp.valley_type || "unknown"}`, `* REASON: ${bp.reason || "N/A"}`, `* AD_SLOT_DURATION: ${bp.ad_slot_duration_rec ?? "N/A"}s`, `* COMPLIANCE: ${bp.compliance_notes || "N/A"}`, "");
+    const tcIn = formatTimecode(Math.max(0, bp.timestamp_sec - (bp.lead_in_sec ?? 2)));
+    const tcOut = formatTimecode(bp.timestamp_sec);
+    lines.push(
+      `${eventNum}  AX       V     C        ${tcIn} ${tcOut} ${tcIn} ${tcOut}`,
+      `* VALLEY_TYPE: ${bp.valley_type || "scene_transition"}`,
+      `* REASON: ${bp.reason || "Natural narrative pause detected"}`,
+      `* CONFIDENCE: ${bp.confidence !== null ? (bp.confidence > 1 ? bp.confidence : (bp.confidence * 100).toFixed(0)) : "N/A"}%`,
+      `* AD_SLOT_DURATION: ${bp.ad_slot_duration_rec ?? 30}s`,
+      `* COMPLIANCE: ${bp.compliance_notes || "No specific compliance flags"}`,
+      "",
+    );
   });
   return lines.join("\n");
 }
 
-function generateOTTManifest(breakpoints: Breakpoint[], projectId: string) {
+function generateOTTManifest(breakpoints: Breakpoint[], projectId: string, projectInfo: ProjectInfo) {
   return {
-    version: "1.0", project_id: projectId, format: "VMAP", generated_at: new Date().toISOString(),
-    ad_breaks: breakpoints.map((bp, i) => ({ ad_slot_id: `${projectId}_slot_${i + 1}`, position_sec: bp.timestamp_sec, time_offset: formatTimecode(bp.timestamp_sec), duration_rec: bp.ad_slot_duration_rec ?? 30, context_type: bp.valley_type || "natural_pause", break_type: "linear", confidence: bp.confidence, compliance_notes: bp.compliance_notes || null, reason: bp.reason || null })),
+    version: "1.0",
+    format: "VMAP",
+    generated_at: new Date().toISOString(),
+    content_id: projectId,
+    content_title: projectInfo.title || "Untitled",
+    delivery_target: projectInfo.delivery_target || "broadcast",
+    total_duration_sec: projectInfo.duration_sec || 0,
+    ad_breaks: breakpoints.map((bp, i) => ({
+      ad_slot_id: `${projectId}_slot_${i + 1}`,
+      position_sec: bp.timestamp_sec,
+      time_offset: formatTimeOffset(bp.timestamp_sec),
+      break_type: "linear" as const,
+      valley_type: bp.valley_type || "scene_transition",
+      confidence: bp.confidence,
+      reason: bp.reason || "Natural narrative pause detected",
+      compliance_notes: bp.compliance_notes || "No specific compliance flags",
+      ad_slot_duration_rec: bp.ad_slot_duration_rec ?? 30,
+    })),
   };
 }
 
@@ -803,13 +833,22 @@ const Results = () => {
   const handleDownloadReel = useCallback(() => { if (reelUrl) window.open(reelUrl, "_blank"); }, [reelUrl]);
 
   const handleDownloadMasterPackage = useCallback(() => {
+    const safeTitle = (projectInfo.title || "StoryBreak-Export").replace(/[^a-zA-Z0-9_-]/g, "_");
     const edl = generateEDL(breakpoints, projectInfo.title || "StoryBreak Export");
-    const ott = generateOTTManifest(breakpoints, projectId || "");
+    const ott = generateOTTManifest(breakpoints, projectId || "", projectInfo);
+
     const edlBlob = new Blob([edl], { type: "text/plain" });
     const ottBlob = new Blob([JSON.stringify(ott, null, 2)], { type: "application/json" });
-    const edlUrl = URL.createObjectURL(edlBlob); const edlA = document.createElement("a"); edlA.href = edlUrl; edlA.download = `storybreak-${projectId}.edl`; edlA.click(); URL.revokeObjectURL(edlUrl);
-    setTimeout(() => { const ottUrl = URL.createObjectURL(ottBlob); const ottA = document.createElement("a"); ottA.href = ottUrl; ottA.download = `storybreak-${projectId}-ott-manifest.json`; ottA.click(); URL.revokeObjectURL(ottUrl); }, 200);
-  }, [breakpoints, projectInfo.title, projectId]);
+
+    const edlUrl = URL.createObjectURL(edlBlob);
+    const edlA = document.createElement("a"); edlA.href = edlUrl; edlA.download = `${safeTitle}-breakpoints.edl`; edlA.click(); URL.revokeObjectURL(edlUrl);
+
+    setTimeout(() => {
+      const ottUrl = URL.createObjectURL(ottBlob);
+      const ottA = document.createElement("a"); ottA.href = ottUrl; ottA.download = `${safeTitle}-ott-manifest.json`; ottA.click(); URL.revokeObjectURL(ottUrl);
+      toast({ title: "Master Package exported", description: "EDL + OTT Manifest downloaded successfully." });
+    }, 300);
+  }, [breakpoints, projectInfo, projectId]);
 
   if (!projectId) return <DemoResults />;
 
