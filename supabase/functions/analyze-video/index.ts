@@ -571,10 +571,10 @@ Deno.serve(async (req) => {
     const deliveryLabel = DELIVERY_LABELS[deliveryTarget] || DELIVERY_LABELS.youtube;
     const contentType = project?.content_type || "short_form";
     let durationSec = project?.duration_sec || video.duration_sec || 0;
-    if (!durationSec || durationSec <= 0) {
-      console.warn(`[analyze-video] duration_sec is 0 or missing for project ${projectId}, defaulting to 3600s`);
-      durationSec = 3600;
-      await supabase.from("projects").update({ duration_sec: 3600 }).eq("id", projectId);
+    const durationUnknown = !durationSec || durationSec <= 0;
+    if (durationUnknown) {
+      console.warn(`[analyze-video] duration_sec is 0 or missing for project ${projectId}, will auto-detect after analysis`);
+      durationSec = 3600; // temporary default for chunking logic; will be corrected post-analysis
     }
 
     if (!Deno.env.get("AWS_ACCESS_KEY") || !Deno.env.get("AWS_SECRET_KEY")) throw new Error("AWS credentials not configured");
