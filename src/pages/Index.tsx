@@ -382,13 +382,57 @@ const Index = () => {
     }
   }, [selectedFile, formValid, config, contentType, filmTitle, studio, showTitle, season, episodeNum, episodeTitle, tvStudio, deliveryTarget, navigate, uploadMultipart, uploadSinglePut, videoSourceMode, videoUrl]);
 
+  const checkCodecSupport = useCallback((file: File) => {
+    setCodecWarning(null);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    const blobUrl = URL.createObjectURL(file);
+
+    const cleanup = () => { URL.revokeObjectURL(blobUrl); };
+
+    video.onloadedmetadata = () => {
+      // If the browser can't decode the codec, dimensions will be 0
+      if (video.videoWidth === 0 && video.videoHeight === 0) {
+        setCodecWarning(
+          "This video may use an unsupported codec (e.g. HEVC/H.265, VP9, or AV1). Our AI model requires H.264/AVC in an MP4 container. Analysis will likely fail — please re-encode with H.264 if possible."
+        );
+        cleanup();
+        return;
+      }
+      // Additional check: see if the browser reports the MIME as playable
+      const mime = file.type || "video/mp4";
+      if (typeof MediaSource !== "undefined" && !MediaSource.isTypeSupported(mime)) {
+        // Not all browsers flag this, so only warn — don't block
+        const ext = file.name.split(".").pop()?.toLowerCase();
+        if (ext !== "mp4" && ext !== "mov") {
+          setCodecWarning(
+            `The format "${ext}" may not be compatible with our AI model. For best results, use H.264-encoded MP4 files.`
+          );
+        }
+      }
+      cleanup();
+    };
+
+    video.onerror = () => {
+      setCodecWarning(
+        "We couldn't read this video's codec information. It may use an unsupported format. For reliable analysis, use H.264/AVC in an MP4 container."
+      );
+      cleanup();
+    };
+
+    video.src = blobUrl;
+  }, []);
+
   const handleFileSelect = useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return;
-    setSelectedFile(files[0]);
-    setFileName(files[0].name);
-    setFileSize(files[0].size);
+    const file = files[0];
+    setSelectedFile(file);
+    setFileName(file.name);
+    setFileSize(file.size);
     setError(null);
-  }, []);
+    setCodecWarning(null);
+    checkCodecSupport(file);
+  }, [checkCodecSupport]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(true); }, []);
   const handleDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(false); }, []);
