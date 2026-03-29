@@ -150,14 +150,11 @@ const Processing = () => {
 
   if (!projectId) {
     return (
-      <div className="flex flex-col items-center px-6 py-20 max-w-xl mx-auto">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Sample Processing</h1>
-        <p className="text-muted-foreground mt-2 text-center text-sm">This is a demo view. Upload a real video to see AI processing in action.</p>
-        <DemoStepper />
-        <div className="flex gap-2 mt-12">
-          <Button variant="ghost" size="sm" className="text-xs h-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => navigate("/")}>← Back</Button>
-          <Button size="sm" className="text-xs h-8 rounded-lg glow-blue" onClick={() => navigate("/results")}>Skip to Results</Button>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-6">
+        <AlertCircle className="h-10 w-10 text-muted-foreground/30 mb-4" />
+        <h1 className="text-xl font-bold text-foreground mb-2">No Active Analysis Found</h1>
+        <p className="text-sm text-muted-foreground mb-6">There's no project being processed at this URL.</p>
+        <Button className="rounded-xl glow-blue" onClick={() => navigate("/")}>Start New Analysis</Button>
       </div>
     );
   }

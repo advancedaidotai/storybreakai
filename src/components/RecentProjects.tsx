@@ -93,9 +93,15 @@ function ProjectCard({
 
   const handleClick = () => {
     const s = project.status;
-    if (s === "analyzing" || s === "uploaded" || s === "segments_done" || s === "draft") {
+    const title = getProjectDisplayTitle(project);
+    if (s === "analyzing" || s === "generating_reel" || s === "segments_done") {
+      toast({ title: `Resuming project: ${title}` });
       navigate(`/processing/${project.id}`);
+    } else if (s === "uploaded" || s === "draft") {
+      toast({ title: `Resuming project: ${title}`, description: "Pre-filling form with project metadata." });
+      navigate("/");
     } else {
+      toast({ title: `Resuming project: ${title}` });
       navigate(`/results/${project.id}`);
     }
   };
