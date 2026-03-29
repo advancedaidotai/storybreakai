@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { filename, content_type, file_size, duration_sec } = await req.json();
+    const { filename, content_type, file_size, duration_sec, is_sample, s3_uri_override } = await req.json();
 
     // Validate input
     if (!filename || typeof filename !== "string") {
@@ -113,19 +113,6 @@ Deno.serve(async (req) => {
     if (!content_type || !["video/mp4", "video/quicktime"].includes(content_type)) {
       return new Response(JSON.stringify({ error: "Invalid content_type. Only video/mp4 and video/quicktime allowed." }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Read secrets
-    const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY");
-    const awsSecretKey = Deno.env.get("AWS_SECRET_KEY");
-    const s3Bucket = Deno.env.get("S3_BUCKET") || "storybreak-ai-videos";
-    const bedrockRegion = Deno.env.get("BEDROCK_REGION") || "us-east-1";
-
-    if (!awsAccessKey || !awsSecretKey) {
-      return new Response(JSON.stringify({ error: "AWS credentials not configured" }), {
-        status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -156,10 +143,48 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Sample video: use override URI, skip presigned URL
+    if (is_sample && s3_uri_override) {
+      const { error: vidErr } = await supabase.from("videos").insert({
+        project_id: project.id,
+        original_filename: filename,
+        s3_uri: s3_uri_override,
+        duration_sec: duration_sec ?? null,
+      });
+
+      if (vidErr) {
+        return new Response(JSON.stringify({ error: "Failed to create video record", details: vidErr.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(
+        JSON.stringify({
+          project_id: project.id,
+          s3_uri: s3_uri_override,
+          is_sample: true,
+        }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Regular upload flow
+    const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY");
+    const awsSecretKey = Deno.env.get("AWS_SECRET_KEY");
+    const s3Bucket = Deno.env.get("S3_BUCKET") || "storybreak-ai-videos";
+    const bedrockRegion = Deno.env.get("BEDROCK_REGION") || "us-east-1";
+
+    if (!awsAccessKey || !awsSecretKey) {
+      return new Response(JSON.stringify({ error: "AWS credentials not configured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const s3Key = `uploads/${project.id}/${filename}`;
     const s3Uri = `s3://${s3Bucket}/${s3Key}`;
 
-    // Create video record
     const { error: vidErr } = await supabase.from("videos").insert({
       project_id: project.id,
       original_filename: filename,
@@ -174,7 +199,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Generate presigned URL
     const presignedUrl = await presignedPutUrl({
       bucket: s3Bucket,
       key: s3Key,
