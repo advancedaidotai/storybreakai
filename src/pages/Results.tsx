@@ -769,7 +769,7 @@ const Results = () => {
   const [breakpoints, setBreakpoints] = useState<Breakpoint[]>([]);
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [reelUrl, setReelUrl] = useState<string | null>(null);
+  
   const [totalDuration, setTotalDuration] = useState(0);
   const [selected, setSelected] = useState<SelectedItem | null>(null);
   const [projectInfo, setProjectInfo] = useState<ProjectInfo>({ title: "", content_type: null, content_metadata: null, delivery_target: null, duration_sec: null });
