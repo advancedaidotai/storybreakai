@@ -359,7 +359,10 @@ async function callPegasus(
   }
 
   let responseText: string;
-  if (bedrockData?.results?.[0]?.outputText) {
+  if (typeof bedrockData?.message === "string") {
+    responseText = bedrockData.message;
+    console.log(`[analyze-video] Extracted text from message field`);
+  } else if (bedrockData?.results?.[0]?.outputText) {
     responseText = bedrockData.results[0].outputText;
     console.log(`[analyze-video] Extracted text from results[0].outputText`);
   } else if (bedrockData?.output?.text) {
