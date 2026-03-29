@@ -5,7 +5,7 @@ import {
   Play, Sparkles, Star, FileJson, Zap, Loader2,
   MessageCircle, ArrowRightLeft, Heart, Film, Package,
   Clock, Shield, Timer, Minus, Plus, ChevronLeft, ChevronRight,
-  List, Diamond, MonitorPlay, Clapperboard, AlertCircle, CheckCircle2, XCircle, Ban, RefreshCw,
+  List, Diamond, MonitorPlay, Clapperboard, AlertCircle, CheckCircle2, XCircle, Ban, RefreshCw, AlertTriangle,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
@@ -966,6 +966,7 @@ const Results = () => {
   const [reDeliveryTarget, setReDeliveryTarget] = useState("");
   const [reContentType, setReContentType] = useState("");
   const [reAnalyzing, setReAnalyzing] = useState(false);
+  const [reAnalyzeConfirm, setReAnalyzeConfirm] = useState(false);
 
   // Sync modal defaults when project loads
   useEffect(() => {
@@ -1289,58 +1290,90 @@ const Results = () => {
       </div>
 
       {/* Re-Analyze Modal */}
-      <Dialog open={reAnalyzeOpen} onOpenChange={setReAnalyzeOpen}>
+      <Dialog open={reAnalyzeOpen} onOpenChange={(open) => { setReAnalyzeOpen(open); if (!open) setReAnalyzeConfirm(false); }}>
         <DialogContent className="sm:max-w-md glass-panel border-border/40">
-          <DialogHeader>
-            <DialogTitle className="text-foreground">Re-Analyze Video</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Change distribution and content settings, then re-run AI analysis on the same video.
-            </DialogDescription>
-          </DialogHeader>
+          {!reAnalyzeConfirm ? (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-foreground">Re-Analyze Video</DialogTitle>
+                <DialogDescription className="text-muted-foreground">
+                  Change distribution and content settings, then re-run AI analysis on the same video.
+                </DialogDescription>
+              </DialogHeader>
 
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Delivery Target</Label>
-              <Select value={reDeliveryTarget} onValueChange={setReDeliveryTarget}>
-                <SelectTrigger className="bg-surface-0 border-border/30">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ott">OTT / Streaming</SelectItem>
-                  <SelectItem value="broadcast">Broadcast TV</SelectItem>
-                  <SelectItem value="youtube">YouTube</SelectItem>
-                  <SelectItem value="social">Social Media</SelectItem>
-                  <SelectItem value="cable_vod">Cable / VOD</SelectItem>
-                  <SelectItem value="streaming">Streaming</SelectItem>
-                  <SelectItem value="short_form">Short-Form</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <div className="space-y-4 py-2">
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Delivery Target</Label>
+                  <Select value={reDeliveryTarget} onValueChange={setReDeliveryTarget}>
+                    <SelectTrigger className="bg-surface-0 border-border/30">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ott">OTT / Streaming</SelectItem>
+                      <SelectItem value="broadcast">Broadcast TV</SelectItem>
+                      <SelectItem value="youtube">YouTube</SelectItem>
+                      <SelectItem value="social">Social Media</SelectItem>
+                      <SelectItem value="cable_vod">Cable / VOD</SelectItem>
+                      <SelectItem value="streaming">Streaming</SelectItem>
+                      <SelectItem value="short_form">Short-Form</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
 
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Content Type</Label>
-              <Select value={reContentType} onValueChange={setReContentType}>
-                <SelectTrigger className="bg-surface-0 border-border/30">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="short_form">Short Form</SelectItem>
-                  <SelectItem value="tv_episode">TV Episode</SelectItem>
-                  <SelectItem value="feature_film">Feature Film</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Content Type</Label>
+                  <Select value={reContentType} onValueChange={setReContentType}>
+                    <SelectTrigger className="bg-surface-0 border-border/30">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="short_form">Short Form</SelectItem>
+                      <SelectItem value="tv_episode">TV Episode</SelectItem>
+                      <SelectItem value="feature_film">Feature Film</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-          <DialogFooter className="gap-2">
-            <Button variant="ghost" size="sm" onClick={() => setReAnalyzeOpen(false)} disabled={reAnalyzing}>
-              Cancel
-            </Button>
-            <Button size="sm" className="gap-1.5" onClick={handleReAnalyze} disabled={!reAnalyzeChanged || reAnalyzing}>
-              {reAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
-              Start Re-Analysis
-            </Button>
-          </DialogFooter>
+              <DialogFooter className="gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setReAnalyzeOpen(false)}>
+                  Cancel
+                </Button>
+                <Button size="sm" className="gap-1.5" onClick={() => setReAnalyzeConfirm(true)} disabled={!reAnalyzeChanged}>
+                  <RefreshCw className="h-3.5 w-3.5" />
+                  Start Re-Analysis
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-foreground">
+                  <AlertTriangle className="h-5 w-5 text-destructive" />
+                  Confirm Re-Analysis
+                </DialogTitle>
+              </DialogHeader>
+
+              <div className="py-2 space-y-3">
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  This will <span className="font-semibold text-foreground">permanently delete</span> all existing segments, breakpoints, highlights, and analysis data for this project.
+                </p>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  The video file will be preserved and re-analyzed with your new settings.
+                </p>
+              </div>
+
+              <DialogFooter className="gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setReAnalyzeConfirm(false)} disabled={reAnalyzing}>
+                  Go Back
+                </Button>
+                <Button variant="destructive" size="sm" className="gap-1.5" onClick={handleReAnalyze} disabled={reAnalyzing}>
+                  {reAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <AlertTriangle className="h-3.5 w-3.5" />}
+                  Confirm &amp; Re-Analyze
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>
