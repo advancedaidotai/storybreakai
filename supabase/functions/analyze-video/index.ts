@@ -189,12 +189,63 @@ function validateAndClean(raw: unknown, projectId: string): { result: AnalysisRe
   return { result: { segments, breakpoints, highlights }, logs };
 }
 
+function repairTruncatedJSON(text: string): string {
+  // Close open strings, arrays, and objects
+  let inString = false;
+  let escape = false;
+  const stack: string[] = [];
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\") { escape = true; continue; }
+    if (inString) {
+      if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') { inString = true; continue; }
+    if (ch === "{") stack.push("}");
+    else if (ch === "[") stack.push("]");
+    else if (ch === "}" || ch === "]") stack.pop();
+  }
+
+  let repaired = text;
+  // Close open string
+  if (inString) repaired += '"';
+  // Remove trailing comma before closing
+  repaired = repaired.replace(/,\s*$/, "");
+  // Close all open brackets/braces in reverse order
+  while (stack.length > 0) repaired += stack.pop();
+  return repaired;
+}
+
 function extractJSON(text: string): unknown {
+  // Direct parse
   try { return JSON.parse(text); } catch { /* continue */ }
+
+  // Code block extraction
   const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-  if (codeBlockMatch) return JSON.parse(codeBlockMatch[1].trim());
+  if (codeBlockMatch) {
+    try { return JSON.parse(codeBlockMatch[1].trim()); } catch {
+      try { return JSON.parse(repairTruncatedJSON(codeBlockMatch[1].trim())); } catch { /* continue */ }
+    }
+  }
+
+  // Brace extraction
   const braceMatch = text.match(/\{[\s\S]*\}/);
-  if (braceMatch) return JSON.parse(braceMatch[0]);
+  if (braceMatch) {
+    try { return JSON.parse(braceMatch[0]); } catch {
+      try { return JSON.parse(repairTruncatedJSON(braceMatch[0])); } catch { /* continue */ }
+    }
+  }
+
+  // Last resort: find the opening brace and repair everything after it
+  const firstBrace = text.indexOf("{");
+  if (firstBrace >= 0) {
+    const partial = text.slice(firstBrace);
+    try { return JSON.parse(repairTruncatedJSON(partial)); } catch { /* continue */ }
+  }
+
   throw new Error("Could not extract JSON from AI response");
 }
 
