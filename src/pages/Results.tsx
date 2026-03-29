@@ -723,6 +723,8 @@ function statusColor(state: ReadinessState) {
 interface ReadinessInfo {
   analysis: ReadinessState;
   edl: ReadinessState;
+  fcpxml: ReadinessState;
+  premiereXml: ReadinessState;
   ottJson: ReadinessState;
 }
 
