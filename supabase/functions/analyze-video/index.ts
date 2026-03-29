@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { BedrockRuntimeClient, InvokeModelCommand } from "npm:@aws-sdk/client-bedrock-runtime";
+import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3";
 import { GetCallerIdentityCommand, STSClient } from "npm:@aws-sdk/client-sts";
 
 const corsHeaders = {
@@ -390,6 +391,75 @@ function calculateChunks(durationSec: number): { start_sec: number; end_sec: num
   return chunks;
 }
 
+// ─── Ensure video is in S3 ───────────────────────────────────────────────────
+
+async function ensureS3Uri(
+  currentUri: string,
+  projectId: string,
+  supabase: any,
+): Promise<string> {
+  // Already an S3 URI — use directly
+  if (currentUri.startsWith("s3://")) {
+    console.log(`[analyze-video] Video already in S3: ${currentUri}`);
+    return currentUri;
+  }
+
+  // External URL — download and re-upload to S3
+  if (!currentUri.startsWith("http://") && !currentUri.startsWith("https://")) {
+    throw new Error(`Unsupported video URI scheme: ${currentUri.slice(0, 80)}`);
+  }
+
+  const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY")!;
+  const awsSecretKey = Deno.env.get("AWS_SECRET_KEY")!;
+  const bedrockRegion = Deno.env.get("BEDROCK_REGION") || "us-east-1";
+  const s3Bucket = Deno.env.get("S3_BUCKET") || "storybreak-ai-videos";
+
+  // Derive a filename from the URL
+  const urlPath = new URL(currentUri).pathname;
+  const originalFilename = decodeURIComponent(urlPath.split("/").pop() || "video.mp4")
+    .replace(/[^a-zA-Z0-9._-]/g, "_");
+  const s3Key = `uploads/${projectId}/${originalFilename}`;
+  const s3Uri = `s3://${s3Bucket}/${s3Key}`;
+
+  console.log(`[analyze-video] Downloading video from URL: ${currentUri.slice(0, 200)}`);
+  const dlResp = await fetch(currentUri);
+  if (!dlResp.ok) {
+    throw new Error(`Failed to download video (${dlResp.status}): ${currentUri.slice(0, 200)}`);
+  }
+
+  const videoBytes = new Uint8Array(await dlResp.arrayBuffer());
+  const contentType = dlResp.headers.get("content-type") || "video/mp4";
+  console.log(`[analyze-video] Downloaded ${(videoBytes.byteLength / 1024 / 1024).toFixed(1)} MB, uploading to S3: ${s3Key}`);
+
+  const s3Client = new S3Client({
+    region: bedrockRegion,
+    credentials: {
+      accessKeyId: awsAccessKey,
+      secretAccessKey: awsSecretKey,
+    },
+  });
+
+  await s3Client.send(new PutObjectCommand({
+    Bucket: s3Bucket,
+    Key: s3Key,
+    Body: videoBytes,
+    ContentType: contentType,
+  }));
+
+  console.log(`[analyze-video] Uploaded to S3: ${s3Uri}`);
+
+  // Update the video record with the new S3 URI
+  const { error: updateErr } = await supabase
+    .from("videos")
+    .update({ s3_uri: s3Uri })
+    .eq("project_id", projectId);
+  if (updateErr) {
+    console.error(`[analyze-video] Warning: failed to update video s3_uri:`, updateErr.message);
+  }
+
+  return s3Uri;
+}
+
 // ─── Main handler ────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -407,7 +477,7 @@ Deno.serve(async (req) => {
     }
 
     // Fetch video + project
-    const { data: video, error: vidErr } = await supabase.from("videos").select("s3_uri, duration_sec").eq("project_id", projectId).single();
+    const { data: video, error: vidErr } = await supabase.from("videos").select("s3_uri, duration_sec, original_filename").eq("project_id", projectId).single();
     if (vidErr || !video?.s3_uri) {
       return new Response(JSON.stringify({ error: "Video not found for project" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -420,6 +490,9 @@ Deno.serve(async (req) => {
 
     if (!Deno.env.get("AWS_ACCESS_KEY") || !Deno.env.get("AWS_SECRET_KEY")) throw new Error("AWS credentials not configured");
 
+    // Ensure video is in S3 (download + re-upload if external URL)
+    const s3Uri = await ensureS3Uri(video.s3_uri, projectId, supabase);
+
     // Update status
     await supabase.from("projects").update({ status: "analyzing" }).eq("id", projectId);
 
@@ -429,8 +502,9 @@ Deno.serve(async (req) => {
     if (!useMultiPass) {
       // ── SINGLE-PASS ──────────────────────────────────────────────
       console.log(`[analyze-video] SINGLE-PASS for project ${projectId} (${durationSec}s, ${contentType})`);
-      const prompt = buildPrompt({ s3Uri: video.s3_uri, deliveryLabel, deliveryTarget, contentType });
-      const { result: analysis, logs } = await callPegasus(prompt, projectId, video.s3_uri);
+      console.log(`[analyze-video] Starting Pegasus analysis...`);
+      const prompt = buildPrompt({ s3Uri, deliveryLabel, deliveryTarget, contentType });
+      const { result: analysis, logs } = await callPegasus(prompt, projectId, s3Uri);
       await flushLogs(supabase, logs);
 
       if (analysis.segments.length === 0) {
@@ -522,7 +596,7 @@ Deno.serve(async (req) => {
 
       try {
         const prompt = buildPrompt({
-          s3Uri: video.s3_uri,
+          s3Uri,
           deliveryLabel,
           deliveryTarget,
           contentType,
@@ -535,7 +609,7 @@ Deno.serve(async (req) => {
           },
         });
 
-        const { result: analysis, logs: chunkLogs } = await callPegasus(prompt, projectId, video.s3_uri);
+        const { result: analysis, logs: chunkLogs } = await callPegasus(prompt, projectId, s3Uri);
         await flushLogs(supabase, chunkLogs);
 
         await supabase.from("analysis_chunks").update({
