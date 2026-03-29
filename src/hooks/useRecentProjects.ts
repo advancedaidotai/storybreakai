@@ -22,11 +22,11 @@ async function fetchRecentProjects(): Promise<RecentProject[]> {
   return (data ?? []) as RecentProject[];
 }
 
-export function useRecentProjects() {
+export function useRecentProjects(enablePolling = true) {
   return useQuery({
     queryKey: ["recent-projects"],
     queryFn: fetchRecentProjects,
-    refetchInterval: 30_000,
+    refetchInterval: enablePolling ? 30_000 : false,
     staleTime: 10_000,
   });
 }
