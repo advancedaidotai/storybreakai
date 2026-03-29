@@ -548,36 +548,96 @@ function Timeline({
 
 // ─── Breakpoint Storyboard ───────────────────────────────────────────────────
 
-function BreakpointStoryboard({ breakpoints, selected, onCardClick }: { breakpoints: Breakpoint[]; selected: SelectedItem | null; onCardClick: (bp: Breakpoint) => void }) {
+function BreakpointStoryboard({ breakpoints, selected, currentTime, onCardClick }: { breakpoints: Breakpoint[]; selected: SelectedItem | null; currentTime: number; onCardClick: (bp: Breakpoint) => void }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Determine which card is "active" based on current playback position
+  const activeCardId = useMemo(() => {
+    for (let i = breakpoints.length - 1; i >= 0; i--) {
+      const bp = breakpoints[i];
+      const leadIn = bp.lead_in_sec ?? 3;
+      const start = bp.timestamp_sec - leadIn - 5;
+      const end = bp.timestamp_sec + 5;
+      if (currentTime >= start && currentTime <= end) return bp.id;
+    }
+    return null;
+  }, [breakpoints, currentTime]);
+
   return (
-    <div className="glass-panel-elevated rounded-2xl p-4">
-      <h2 className="font-semibold text-xs tracking-wide uppercase text-foreground/80 mb-3 flex items-center gap-2">
+    <div className="glass-panel-elevated rounded-2xl p-5">
+      <h2 className="font-semibold text-xs tracking-wide uppercase text-foreground/80 mb-4 flex items-center gap-2">
         <Zap className="h-3.5 w-3.5 text-breakpoint" /> Ad-Break Storyboard
       </h2>
-      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
+      <div ref={scrollRef} className="flex gap-4 overflow-x-auto pb-3 scrollbar-thin">
         {breakpoints.map((bp, i) => {
           const isSelected = selected?.kind === "breakpoint" && selected.data.id === bp.id;
+          const isActive = activeCardId === bp.id;
           const valley = VALLEY_CONFIG[bp.valley_type || ""] || VALLEY_CONFIG.scene_transition;
           const ValleyIcon = valley.icon;
           const confNorm = bp.confidence !== null ? (bp.confidence! > 1 ? bp.confidence! / 100 : bp.confidence) : null;
+
+          // Confidence badge color
+          const confBadgeBg = confNorm === null ? "bg-muted/30"
+            : confNorm >= 0.85 ? "bg-[#10B981]/20"
+            : confNorm >= 0.65 ? "bg-[#F59E0B]/20"
+            : "bg-[#EF4444]/20";
+          const confBadgeText = confNorm === null ? "text-muted-foreground"
+            : confNorm >= 0.85 ? "text-[#10B981]"
+            : confNorm >= 0.65 ? "text-[#F59E0B]"
+            : "text-[#EF4444]";
+          const confBadgeBorder = confNorm === null ? "border-muted/30"
+            : confNorm >= 0.85 ? "border-[#10B981]/30"
+            : confNorm >= 0.65 ? "border-[#F59E0B]/30"
+            : "border-[#EF4444]/30";
+
           return (
-            <div key={bp.id} onClick={() => onCardClick(bp)} className={`flex-shrink-0 w-52 p-3.5 rounded-xl cursor-pointer transition-all duration-300 glass-tooltip border ${isSelected ? "border-primary/50 ring-1 ring-primary/30 scale-[1.02]" : "border-border/20 hover:border-border/40 hover:scale-[1.01]"}`}>
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-[10px] font-bold text-muted-foreground/60">BREAK {i + 1}</span>
-                <span className="text-xs font-mono font-semibold text-foreground">{formatTime(bp.timestamp_sec)}</span>
+            <div
+              key={bp.id}
+              onClick={() => onCardClick(bp)}
+              className={`flex-shrink-0 w-[220px] p-4 rounded-xl cursor-pointer transition-all duration-300 glass-tooltip border-2
+                ${isActive ? "storyboard-card-active" : ""}
+                ${isSelected ? "border-primary/60 ring-1 ring-primary/30 scale-[1.03]" : "border-border/20 hover:border-border/40 hover:scale-[1.01]"}
+              `}
+            >
+              {/* Header: Break # + Timestamp */}
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[10px] font-bold text-muted-foreground/60 tracking-wider">BREAK {i + 1}</span>
+                <span className="text-sm font-mono font-bold text-foreground">{formatTime(bp.timestamp_sec)}</span>
               </div>
-              <div className="flex items-center gap-2 mb-2">
-                <ValleyIcon className={`h-4 w-4 ${valley.color}`} />
-                <span className="text-[11px] font-medium text-foreground">{valley.label}</span>
+
+              {/* Valley Type Icon — Large */}
+              <div className="flex items-center gap-3 mb-3">
+                <div className="h-10 w-10 rounded-xl bg-surface-1/80 flex items-center justify-center shrink-0 border border-border/20">
+                  <ValleyIcon className={`h-[32px] w-[32px] ${valley.color}`} strokeWidth={1.5} />
+                </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-semibold text-foreground block">{valley.label}</span>
+                  <span className="text-[10px] text-muted-foreground">Narrative Valley</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 mb-2">
-                <Badge variant="outline" className={`text-[9px] px-1.5 py-0 h-4 ${confidenceBadgeClasses(confNorm)}`}>{confNorm !== null ? `${(confNorm * 100).toFixed(0)}%` : "—"}</Badge>
-                {bp.ad_slot_duration_rec && <span className="flex items-center gap-1 text-[10px] text-muted-foreground"><Timer className="h-3 w-3" />{bp.ad_slot_duration_rec}s slot</span>}
+
+              {/* Confidence Badge + Ad Slot */}
+              <div className="flex items-center gap-2 mb-3">
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${confBadgeBg} ${confBadgeText} ${confBadgeBorder}`}>
+                  {confNorm !== null ? `${(confNorm * 100).toFixed(0)}%` : "—"}
+                </span>
+                {bp.ad_slot_duration_rec && (
+                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <Timer className="h-3 w-3" />{bp.ad_slot_duration_rec}s
+                  </span>
+                )}
               </div>
+
+              {/* Reason — 2-line truncated */}
+              {bp.reason && (
+                <p className="text-[11px] text-muted-foreground/80 leading-relaxed line-clamp-2 mb-2">{bp.reason}</p>
+              )}
+
+              {/* Compliance Notes */}
               {bp.compliance_notes && (
-                <div className="flex items-start gap-1.5 mt-1">
-                  <Shield className="h-3 w-3 text-muted-foreground/50 mt-0.5 shrink-0" />
-                  <p className="text-[9px] text-muted-foreground/70 line-clamp-2 leading-relaxed">{bp.compliance_notes}</p>
+                <div className="flex items-start gap-1.5 pt-2 border-t border-border/15">
+                  <Shield className="h-3 w-3 text-muted-foreground/40 mt-0.5 shrink-0" />
+                  <p className="text-[9px] text-muted-foreground/50 line-clamp-1 leading-relaxed">{bp.compliance_notes}</p>
                 </div>
               )}
             </div>
@@ -685,6 +745,16 @@ const Results = () => {
   const [selected, setSelected] = useState<SelectedItem | null>(null);
   const [projectInfo, setProjectInfo] = useState<ProjectInfo>({ title: "", content_type: null, content_metadata: null, delivery_target: null, duration_sec: null });
   const [chunks, setChunks] = useState<AnalysisChunk[]>([]);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  // Track video playback position
+  useEffect(() => {
+    const vid = videoRef.current;
+    if (!vid) return;
+    const onTime = () => setCurrentTime(vid.currentTime);
+    vid.addEventListener("timeupdate", onTime);
+    return () => vid.removeEventListener("timeupdate", onTime);
+  }, [videoUrl]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -794,7 +864,7 @@ const Results = () => {
       {/* Breakpoint Storyboard */}
       {breakpoints.length > 0 && (
         <div className="fade-in-600 fade-in-delay-2">
-          <BreakpointStoryboard breakpoints={breakpoints} selected={selected} onCardClick={handleBreakpointCardClick} />
+          <BreakpointStoryboard breakpoints={breakpoints} selected={selected} currentTime={currentTime} onCardClick={handleBreakpointCardClick} />
         </div>
       )}
 
