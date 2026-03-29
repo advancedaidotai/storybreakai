@@ -253,31 +253,4 @@ const Processing = () => {
   );
 };
 
-function DemoStepper() {
-  return (
-    <div className="mt-14 w-full max-w-sm space-y-0">
-      {STEPS.map((step, i) => {
-        const Icon = step.icon;
-        const isDone = i < 2;
-        const isActive = i === 2;
-        return (
-          <div key={step.key} className="flex gap-4">
-            <div className="flex flex-col items-center">
-              <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300 ${isDone ? "bg-segment/20 text-segment" : isActive ? "bg-primary/20 text-primary animate-pulse glow-blue" : "bg-surface-2 text-muted-foreground/40"}`}>
-                {isDone ? <Check className="h-4 w-4" /> : isActive ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
-              </div>
-              {i < STEPS.length - 1 && <div className={`w-px flex-1 min-h-[32px] ${isDone ? "bg-segment/30" : "bg-border/30"}`} />}
-            </div>
-            <div className="pb-6">
-              <p className={`font-medium text-sm ${isDone ? "text-foreground" : isActive ? "text-primary" : "text-muted-foreground/50"}`}>{step.label}</p>
-              {isActive && <p className="text-xs text-primary/70 mt-0.5 font-medium tracking-wide uppercase">In progress…</p>}
-              {isDone && <p className="text-xs text-segment/70 mt-0.5">Complete</p>}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export default Processing;
