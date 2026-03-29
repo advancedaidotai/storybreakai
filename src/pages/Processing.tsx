@@ -161,13 +161,13 @@ const Processing = () => {
     
     supabase.functions.invoke("analyze-video", { body: { project_id: projectId } })
       .then(({ data, error: fnErr }) => {
-        if (fnErr) {
-          console.error("[Processing] analyze-video invoke error:", fnErr.message);
-          setError(`Analysis failed to start: ${fnErr.message}`);
-          setStatus("failed");
-        } else if (data?.error) {
-          console.error("[Processing] analyze-video returned error:", data.error);
-          setError(`Analysis error: ${data.error}`);
+        // The Supabase SDK puts a generic message in fnErr for non-2xx responses,
+        // but the actual error detail is in the data body
+        const serverError = data?.error;
+        if (fnErr || serverError) {
+          const detail = serverError || fnErr?.message || "Unknown error";
+          console.error("[Processing] analyze-video error:", detail);
+          setError(`Analysis error: ${detail}`);
           setStatus("failed");
         } else {
           
