@@ -591,8 +591,8 @@ async function ensureS3Uri(
   const s3Key = `uploads/${projectId}/${originalFilename}`;
   const s3Uri = `s3://${s3Bucket}/${s3Key}`;
 
-  console.log(`[analyze-video] Streaming video from URL to S3: ${currentUri.slice(0, 200)}`);
-  const MAX_DOWNLOAD_SIZE = 5_368_709_120; // 5 GB (presigned PUT limit)
+  console.log(`[analyze-video] Downloading video from URL to re-upload to S3: ${currentUri.slice(0, 200)}`);
+  const MAX_DOWNLOAD_SIZE = 5_368_709_120; // 5 GB
   const dlResp = await fetch(currentUri);
   if (!dlResp.ok) {
     throw new Error(`Failed to download video (${dlResp.status}): ${currentUri.slice(0, 200)}`);
@@ -612,6 +612,17 @@ async function ensureS3Uri(
 
   const contentType = dlResp.headers.get("content-type") || "video/mp4";
 
+  // Buffer the download into memory so we have a known Content-Length for the S3 PUT.
+  // Streaming a ReadableStream body via fetch() uses chunked transfer encoding,
+  // which S3 presigned PUTs do not support — they require Content-Length.
+  console.log(`[analyze-video] Buffering video download into memory...`);
+  const videoBuffer = new Uint8Array(await dlResp.arrayBuffer());
+  console.log(`[analyze-video] Buffered ${(videoBuffer.byteLength / 1_048_576).toFixed(1)} MB`);
+
+  if (videoBuffer.byteLength > MAX_DOWNLOAD_SIZE) {
+    throw new Error(`Video file too large (${(videoBuffer.byteLength / 1_073_741_824).toFixed(1)} GB). Maximum allowed is 5 GB.`);
+  }
+
   const s3Client = new S3Client({
     region: s3Region,
     credentials: {
@@ -620,19 +631,22 @@ async function ensureS3Uri(
     },
   });
 
-  // Use presigned URL to avoid per-part SHA-256 hashing (CPU killer in edge functions)
+  // Use presigned URL with the buffered body so Content-Length is sent correctly
   const presignedUrl = await getSignedUrl(s3Client, new PutObjectCommand({
     Bucket: s3Bucket,
     Key: s3Key,
     ContentType: contentType,
   }), { expiresIn: 3600 });
 
-  console.log(`[analyze-video] Generated presigned URL, streaming upload...`);
+  console.log(`[analyze-video] Generated presigned URL, uploading ${(videoBuffer.byteLength / 1_048_576).toFixed(1)} MB...`);
 
   const uploadResp = await fetch(presignedUrl, {
     method: "PUT",
-    body: dlResp.body,
-    headers: { "Content-Type": contentType },
+    body: videoBuffer,
+    headers: {
+      "Content-Type": contentType,
+      "Content-Length": String(videoBuffer.byteLength),
+    },
   });
 
   if (!uploadResp.ok) {
@@ -690,10 +704,13 @@ Deno.serve(async (req) => {
     let durationSec = project?.duration_sec || video.duration_sec || 0;
     const durationUnknown = !durationSec || durationSec <= 0;
     if (durationUnknown) {
-      console.warn(`[analyze-video] duration_sec is 0 or missing for project ${projectId}, defaulting to multi-pass safe value`);
-      // Default to a value that forces multi-pass, since we don't know the real length
-      // and sending a very long video single-pass causes "Unprocessable video" errors
-      durationSec = MAX_SINGLE_PASS + 1;
+      console.warn(`[analyze-video] duration_sec is 0 or missing for project ${projectId}, defaulting to single-pass safe value`);
+      // Default to MAX_SINGLE_PASS so unknown-duration videos use single-pass analysis.
+      // Single-pass handles up to 60 minutes, which covers most submitted videos.
+      // The duration is auto-corrected from Pegasus response timestamps afterward.
+      // Previously this was MAX_SINGLE_PASS + 1, which forced multi-pass unnecessarily
+      // and caused issues with URL-submitted videos that have no duration metadata.
+      durationSec = MAX_SINGLE_PASS;
     }
 
     if (!Deno.env.get("AWS_ACCESS_KEY") || !Deno.env.get("AWS_SECRET_KEY")) throw new Error("AWS credentials not configured");
