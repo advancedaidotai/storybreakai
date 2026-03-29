@@ -609,7 +609,7 @@ function BreakpointStoryboard({ breakpoints, selected, currentTime, onCardClick 
   return (
     <div className="glass-panel-elevated rounded-2xl p-5">
       <h2 className="font-semibold text-xs tracking-wide uppercase text-foreground/80 mb-4 flex items-center gap-2">
-        <Zap className="h-3.5 w-3.5 text-breakpoint" /> Ad-Break Storyboard
+        <Zap className="h-3.5 w-3.5 text-breakpoint" /> Where to Place Ad Breaks
       </h2>
       <div ref={scrollRef} className="flex gap-4 overflow-x-auto pb-3 scrollbar-thin">
         {breakpoints.map((bp, i) => {
