@@ -132,7 +132,15 @@ Deno.serve(async (req) => {
     // Create project
     const { data: project, error: projErr } = await supabase
       .from("projects")
-      .insert({ title, status: "uploaded", delivery_target: delivery_target || null })
+      .insert({
+        title,
+        status: "uploaded",
+        delivery_target: delivery_target || null,
+        content_type: content_type_enum || "short_form",
+        content_metadata: content_metadata || null,
+        duration_sec: duration_sec ?? null,
+        file_size_bytes: file_size ?? null,
+      })
       .select("id")
       .single();
 
