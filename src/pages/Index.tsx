@@ -551,7 +551,7 @@ const Index = () => {
           <div className={`${panelStyle} p-5`} style={{ backgroundColor: panelBg }}>
             <div className="flex items-center gap-2.5 mb-4">
               <StepBadge n={3} />
-              <h3 className="text-sm font-semibold text-foreground"><h3 className="text-sm font-semibold text-foreground">Where will this be distributed?</h3></h3>
+              <h3 className="text-sm font-semibold text-foreground">Where will this be distributed?</h3>
             </div>
             <div>
               <label className="block text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/70 mb-1.5">
