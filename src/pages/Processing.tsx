@@ -8,10 +8,10 @@ import { supabase } from "@/integrations/supabase/client";
 type ProjectStatus = "draft" | "uploaded" | "analyzing" | "segments_done" | "highlights_done" | "generating_reel" | "ready" | "complete" | "failed";
 
 const STEPS = [
-  { key: "uploaded", label: "Uploaded to Cloud", icon: CloudUpload },
-  { key: "analyzing", label: "Analyzing with AI", icon: Brain },
-  { key: "segments_done", label: "Detecting Segments", icon: Layers },
-  { key: "highlights_done", label: "Identifying Highlights", icon: Sparkles },
+  { key: "uploaded", label: "Getting your video ready...", icon: CloudUpload },
+  { key: "analyzing", label: "Finding the story beats...", icon: Brain },
+  { key: "segments_done", label: "Mapping scene boundaries...", icon: Layers },
+  { key: "highlights_done", label: "Spotting the best moments...", icon: Sparkles },
 ] as const;
 
 function statusToStepIndex(status: ProjectStatus): number {
@@ -152,8 +152,8 @@ const Processing = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-6">
         <AlertCircle className="h-10 w-10 text-muted-foreground/30 mb-4" />
-        <h1 className="text-xl font-bold text-foreground mb-2">No Active Analysis Found</h1>
-        <p className="text-sm text-muted-foreground mb-6">There's no project being processed at this URL.</p>
+        <h1 className="text-xl font-bold text-foreground mb-2">Hmm, nothing here yet</h1>
+        <p className="text-sm text-muted-foreground mb-6">We couldn't find an active analysis at this URL. Let's start fresh!</p>
         <Button className="rounded-xl glow-blue" onClick={() => navigate("/")}>Start New Analysis</Button>
       </div>
     );
@@ -161,8 +161,8 @@ const Processing = () => {
 
   return (
     <div className="flex flex-col items-center px-6 py-20 max-w-xl mx-auto animate-fade-in">
-      <h1 className="text-2xl font-bold tracking-tight text-foreground">Refining Your Vision</h1>
-      <p className="text-muted-foreground mt-2 text-center text-sm">AI is analyzing your footage and constructing an intelligent highlight reel.</p>
+      <h1 className="text-2xl font-bold tracking-tight text-foreground">Working some magic ✨</h1>
+      <p className="text-muted-foreground mt-2 text-center text-sm">Our AI is watching your video and mapping every scene, arc, and highlight. This usually takes a few minutes.</p>
 
       {/* Stepper */}
       <div className="mt-14 w-full max-w-sm space-y-0">
@@ -197,9 +197,9 @@ const Processing = () => {
                 }`}>{step.label}</p>
 
                 {isActive && !isError && (
-                  <p className="text-xs text-primary/70 mt-0.5 font-medium tracking-wide uppercase">In progress…</p>
+                  <p className="text-xs text-primary/70 mt-0.5 font-medium tracking-wide">Hang tight, almost there…</p>
                 )}
-                {isDone && <p className="text-xs text-segment/70 mt-0.5">Complete</p>}
+                {isDone && <p className="text-xs text-segment/70 mt-0.5">Done ✓</p>}
 
                 {/* Chunk sub-progress for the "Analyzing with AI" step */}
                 {isActive && !isError && step.key === "analyzing" && chunkProgress && chunkProgress.total > 1 && (
@@ -233,9 +233,9 @@ const Processing = () => {
           <div className="flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="font-semibold text-xs text-destructive uppercase tracking-wide">Processing Failed</p>
+              <p className="font-semibold text-xs text-destructive uppercase tracking-wide">Something went wrong</p>
               <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-                {error || "An error occurred during analysis. This could be a temporary issue — try again."}
+                {error || "The analysis hit a snag — but don't worry, these things happen. Let's give it another shot."}
               </p>
               <Button size="sm" variant="outline" className="mt-3 text-xs h-8 rounded-lg gap-2 border-destructive/30 hover:bg-destructive/10 text-destructive" onClick={handleRetry} disabled={retrying}>
                 <RefreshCw className={`h-3 w-3 ${retrying ? "animate-spin" : ""}`} />
@@ -247,7 +247,7 @@ const Processing = () => {
       )}
 
       <div className="flex items-center justify-center w-full max-w-sm mt-12">
-        <Button variant="ghost" size="sm" className="text-xs h-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => navigate("/")}>← New Analysis</Button>
+        <Button variant="ghost" size="sm" className="text-xs h-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => navigate("/")}>← Start Over</Button>
       </div>
     </div>
   );

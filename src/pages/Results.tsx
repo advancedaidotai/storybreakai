@@ -422,7 +422,7 @@ function Timeline({
   return (
     <div className="glass-panel-elevated rounded-2xl p-5">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="font-semibold text-xs tracking-wide uppercase text-foreground/80">Sequence Intelligence Timeline</h2>
+        <h2 className="font-semibold text-xs tracking-wide uppercase text-foreground/80">Your Story's Timeline</h2>
         <div className="flex items-center gap-2">
           {isLong && zoom > 1 && (
             <span className="text-[10px] font-mono text-primary/60">{zoom.toFixed(1)}×</span>
@@ -609,7 +609,7 @@ function BreakpointStoryboard({ breakpoints, selected, currentTime, onCardClick 
   return (
     <div className="glass-panel-elevated rounded-2xl p-5">
       <h2 className="font-semibold text-xs tracking-wide uppercase text-foreground/80 mb-4 flex items-center gap-2">
-        <Zap className="h-3.5 w-3.5 text-breakpoint" /> Ad-Break Storyboard
+        <Zap className="h-3.5 w-3.5 text-breakpoint" /> Where to Place Ad Breaks
       </h2>
       <div ref={scrollRef} className="flex gap-4 overflow-x-auto pb-3 scrollbar-thin">
         {breakpoints.map((bp, i) => {
@@ -730,9 +730,9 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, readines
     <div className="glass-panel rounded-2xl p-4 flex flex-col gap-4 h-fit lg:sticky lg:top-16 overflow-auto">
       {/* Element Detail */}
       <div>
-        <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">{selected ? "Element Detail" : "Select an Element"}</h3>
+        <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">{selected ? "What We Found" : "Tap to Explore"}</h3>
         {!selected ? (
-          <p className="text-xs text-muted-foreground/60 leading-relaxed">Click any segment, breakpoint, or highlight on the timeline to inspect it.</p>
+          <p className="text-xs text-muted-foreground/60 leading-relaxed">Click any segment, breakpoint, or highlight on the timeline above to see the details.</p>
         ) : selected.kind === "segment" ? (
           <div className="animate-fade-in"><SegmentDetail seg={selected.data} /></div>
         ) : selected.kind === "breakpoint" ? (
@@ -750,7 +750,7 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, readines
 
       {/* Readiness States */}
       <div className="border-t border-border/20 pt-4">
-        <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">Pipeline Status</h3>
+        <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">How Things Look</h3>
         <div className="space-y-2">
           {([
             { key: "analysis" as const, label: "AI Analysis" },
@@ -767,20 +767,20 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, readines
         </div>
         {readiness.analysis === "failed" && (
           <Button variant="outline" size="sm" className="w-full mt-3 gap-2 rounded-xl text-xs h-7 border-destructive/30 text-destructive hover:bg-destructive/10" onClick={onRetry}>
-            <AlertCircle className="h-3 w-3" /> Retry Analysis
+            <AlertCircle className="h-3 w-3" /> Try Again
           </Button>
         )}
       </div>
 
       {/* Export Actions */}
       <div className="border-t border-border/20 pt-4 mt-auto">
-        <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">Export</h3>
+        <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">Get Your Results</h3>
         <div className="flex flex-col gap-2">
           <Button variant="outline" size="sm" className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover" onClick={onExportJSON} disabled={readiness.analysis !== "ready"}>
-            <FileJson className="h-3.5 w-3.5" /> Export JSON
+            <FileJson className="h-3.5 w-3.5" /> Export Full Analysis (JSON)
           </Button>
           <Button variant="outline" size="sm" className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover" onClick={onDownloadMasterPackage} disabled={readiness.edl !== "ready"}>
-            <Package className="h-3.5 w-3.5" /> Download Master Package
+            <Package className="h-3.5 w-3.5" /> Get EDL + OTT Package
           </Button>
         </div>
       </div>
@@ -1031,8 +1031,8 @@ const Results = () => {
         <div className="glass-panel rounded-2xl overflow-hidden cinematic-shadow fade-in-600 fade-in-delay-2">
           <div className="aspect-video bg-primary/[0.02] flex flex-col items-center justify-center gap-3 p-6">
             <Sparkles className="h-8 w-8 text-primary/40" />
-            <p className="text-sm font-semibold text-foreground">Analysis Complete</p>
-            <p className="text-xs text-muted-foreground text-center">{segments.length} segments · {breakpoints.length} breakpoints · {highlights.length} highlights detected</p>
+            <p className="text-sm font-semibold text-foreground">Analysis Complete! 🎬</p>
+            <p className="text-xs text-muted-foreground text-center">Here's what we found: {segments.length} scenes, {breakpoints.length} ad break opportunities, and {highlights.length} highlights.</p>
           </div>
         </div>
 
@@ -1075,9 +1075,9 @@ function DemoResults() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-6">
       <Sparkles className="h-10 w-10 text-primary/40 mb-4" />
-      <h1 className="text-xl font-bold text-foreground mb-2">No Project Selected</h1>
-      <p className="text-sm text-muted-foreground mb-6">Upload a video to see AI analysis results here.</p>
-      <Button className="rounded-xl glow-blue btn-hover" onClick={() => navigate("/")}>Upload Video</Button>
+      <h1 className="text-xl font-bold text-foreground mb-2">Nothing here yet!</h1>
+      <p className="text-sm text-muted-foreground mb-6">Upload a video and we'll show your AI analysis results right here.</p>
+      <Button className="rounded-xl glow-blue btn-hover" onClick={() => navigate("/")}>Let's Get Started</Button>
     </div>
   );
 }
