@@ -1031,8 +1031,8 @@ const Results = () => {
         <div className="glass-panel rounded-2xl overflow-hidden cinematic-shadow fade-in-600 fade-in-delay-2">
           <div className="aspect-video bg-primary/[0.02] flex flex-col items-center justify-center gap-3 p-6">
             <Sparkles className="h-8 w-8 text-primary/40" />
-            <p className="text-sm font-semibold text-foreground">Analysis Complete</p>
-            <p className="text-xs text-muted-foreground text-center">{segments.length} segments · {breakpoints.length} breakpoints · {highlights.length} highlights detected</p>
+            <p className="text-sm font-semibold text-foreground">Analysis Complete! 🎬</p>
+            <p className="text-xs text-muted-foreground text-center">Here's what we found: {segments.length} scenes, {breakpoints.length} ad break opportunities, and {highlights.length} highlights.</p>
           </div>
         </div>
 
