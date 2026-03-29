@@ -72,12 +72,11 @@ function isValidVideoUrl(url: string): boolean {
     if (!["http:", "https:"].includes(parsed.protocol)) return false;
     const lower = parsed.pathname.toLowerCase();
     if (VIDEO_URL_EXTENSIONS.some((ext) => lower.endsWith(ext))) return true;
-    // Allow known video/cloud hosts (S3, GCS, Azure, CloudFront, JWPlayer)
+    // Allow known video/cloud hosts (S3, GCS, Azure, CloudFront, JWPlayer, Archive.org)
     const host = parsed.hostname.toLowerCase();
-    if (["s3.amazonaws.com", "storage.googleapis.com", "blob.core.windows.net", "cloudfront.net", "cdn.jwplayer.com"].some((h) => host.includes(h))) return true;
+    if (["s3.amazonaws.com", "storage.googleapis.com", "blob.core.windows.net", "cloudfront.net", "cdn.jwplayer.com", "archive.org", "ia601", "ia801", "dn720706.ca.archive.org"].some((h) => host.includes(h))) return true;
     if (parsed.searchParams.has("video") || parsed.searchParams.has("v")) return true;
-    // Be permissive - allow any https URL
-    return parsed.protocol === "https:";
+    return false; // No longer accept any random HTTPS URL
   } catch {
     return false;
   }
