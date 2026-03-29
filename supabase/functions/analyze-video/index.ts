@@ -541,8 +541,9 @@ Deno.serve(async (req) => {
     // Ensure video is in S3 (download + re-upload if external URL)
     const s3Uri = await ensureS3Uri(video.s3_uri, projectId, supabase);
 
-    // Update status
+    // Reset status to 'analyzing' (important for retries where status may be 'failed')
     await supabase.from("projects").update({ status: "analyzing" }).eq("id", projectId);
+    console.log(`[analyze-video] Status reset to 'analyzing' for project ${projectId}`);
 
     // ─── Strategy router ─────────────────────────────────────────────
     const useMultiPass = durationSec > MAX_SINGLE_PASS;
