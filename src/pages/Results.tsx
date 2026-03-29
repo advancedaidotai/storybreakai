@@ -755,7 +755,6 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, readines
             { key: "analysis" as const, label: "AI Analysis" },
             { key: "edl" as const, label: "EDL Export" },
             { key: "ottJson" as const, label: "OTT JSON" },
-            { key: "highlightReel" as const, label: "Highlight Reel" },
           ] as const).map(({ key, label }) => (
             <div key={key} className="flex items-center gap-2">
               <StatusIcon state={readiness[key]} />
