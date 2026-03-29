@@ -643,20 +643,46 @@ const Index = () => {
                     </p>
                   )}
                   {urlValid && (
-                    <div className="flex items-center gap-3 p-3 rounded-xl bg-segment/[0.06] border border-segment/20">
-                      <div className="h-9 w-9 rounded-lg bg-segment/15 flex items-center justify-center shrink-0">
-                        <Check className="h-4 w-4 text-segment" />
+                    <div className="space-y-3">
+                      {/* Video preview */}
+                      <div className="relative rounded-xl overflow-hidden border border-segment/20 bg-surface-0/60" style={{ height: 200 }}>
+                        <video
+                          src={videoUrl.trim()}
+                          className="w-full h-full object-contain bg-black"
+                          preload="metadata"
+                          muted
+                          playsInline
+                          onError={(e) => {
+                            // Hide video element and show fallback on CORS/load error
+                            (e.target as HTMLVideoElement).style.display = "none";
+                            const fallback = (e.target as HTMLVideoElement).nextElementSibling as HTMLElement;
+                            if (fallback) fallback.style.display = "flex";
+                          }}
+                        />
+                        {/* Fallback when video can't render (CORS) */}
+                        <div className="absolute inset-0 items-center justify-center gap-2 flex-col" style={{ display: "none" }}>
+                          <Film className="h-8 w-8 text-muted-foreground/40" />
+                          <p className="text-xs text-muted-foreground/60 font-medium">{videoUrl.split("/").pop()?.split("?")[0] || "Video preview unavailable"}</p>
+                        </div>
+                        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent px-3 py-2">
+                          <p className="text-xs font-medium text-white truncate">{videoUrl.split("/").pop()?.split("?")[0] || "Video"}</p>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-foreground">Video URL ready</p>
-                        <p className="text-[10px] text-muted-foreground truncate">{videoUrl}</p>
+                      <div className="flex items-center gap-3 p-3 rounded-xl bg-segment/[0.06] border border-segment/20">
+                        <div className="h-9 w-9 rounded-lg bg-segment/15 flex items-center justify-center shrink-0">
+                          <Check className="h-4 w-4 text-segment" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium text-foreground">Video URL ready</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{videoUrl}</p>
+                        </div>
+                        <button
+                          onClick={() => { setVideoUrl(""); setUrlValid(false); }}
+                          className="shrink-0 h-7 w-7 rounded-lg bg-surface-2/60 flex items-center justify-center hover:bg-destructive/20 hover:text-destructive transition-colors"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
                       </div>
-                      <button
-                        onClick={() => { setVideoUrl(""); setUrlValid(false); }}
-                        className="shrink-0 h-7 w-7 rounded-lg bg-surface-2/60 flex items-center justify-center hover:bg-destructive/20 hover:text-destructive transition-colors"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
                     </div>
                   )}
                   <p className="text-[10px] text-muted-foreground/50">
