@@ -316,11 +316,12 @@ const Index = () => {
 
       {/* Try Sample */}
       <button
-        className="mt-6 flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors duration-200"
-        onClick={() => navigate("/processing")}
+        className="mt-6 flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-all duration-200 btn-hover disabled:opacity-50"
+        onClick={handleTrySample}
+        disabled={loadingSample || isBusy}
       >
-        <Play className="h-3.5 w-3.5" />
-        <span>Try Sample Video</span>
+        {loadingSample ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+        <span>{loadingSample ? "Loading sample…" : "Try Sample Video"}</span>
       </button>
 
       {/* Footer */}
