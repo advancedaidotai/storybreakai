@@ -727,7 +727,7 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, readines
     <div className="glass-panel rounded-2xl p-4 flex flex-col gap-4 h-fit lg:sticky lg:top-16 overflow-auto">
       {/* Element Detail */}
       <div>
-        <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">{selected ? "What We Found" : "Tap to Explore"}</h3>
+        <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">{selected ? "Why We Chose This" : "Tap to Explore"}</h3>
         {!selected ? (
           <p className="text-xs text-muted-foreground/60 leading-relaxed">Click any segment, breakpoint, or highlight on the timeline above to see the details.</p>
         ) : selected.kind === "segment" ? (
