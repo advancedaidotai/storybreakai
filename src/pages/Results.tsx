@@ -23,6 +23,7 @@ import { ROICard } from "@/components/results/ROICard";
 import { ComplianceCard } from "@/components/results/ComplianceCard";
 import { SimilarContent } from "@/components/results/SimilarContent";
 import { AdBreakStoryboard } from "@/components/results/AdBreakStoryboard";
+import { BreakpointReviewPanel } from "@/components/results/BreakpointReviewPanel";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
