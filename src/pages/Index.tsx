@@ -79,6 +79,7 @@ const Index = () => {
   const [episodeTitle, setEpisodeTitle] = useState("");
   const [tvStudio, setTvStudio] = useState("");
 
+  const [deliveryTarget, setDeliveryTarget] = useState("broadcast");
   const [touched, setTouched] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<UploadProgress>({ totalParts: 0, completedParts: 0, bytesUploaded: 0, totalBytes: 0, startTime: 0 });
