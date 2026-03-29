@@ -126,7 +126,7 @@ Deno.serve(async (req) => {
     });
 
     const s3Key = `uploads/${project.id}/${filename}`;
-    const s3Uri = `s3://${s3Bucket}/${s3Key}`;
+    const s3Uri = `s3://${effectiveBucket}/${s3Key}`;
 
     const { error: vidErr } = await supabase.from("videos").insert({
       project_id: project.id,
