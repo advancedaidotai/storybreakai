@@ -105,8 +105,11 @@ const Processing = () => {
         }
       });
 
+    let isPolling = false;
     const poll = async () => {
-      if (!isMounted.current) return;
+      if (!isMounted.current || isPolling) return;
+      isPolling = true;
+      try {
       const { data, error: fetchErr } = await supabase.from("projects").select("status").eq("id", projectId).single();
       if (fetchErr || !data || !isMounted.current) return;
 
@@ -147,6 +150,9 @@ const Processing = () => {
         .eq("project_id", projectId);
       if (!isMounted.current) return;
       if (count !== null) setScenesFound(count);
+      } finally {
+        isPolling = false;
+      }
     };
 
     poll();

@@ -241,21 +241,19 @@ function GridCard({
         </div>
 
         {/* Reason text (truncated) */}
-        {bp.reason && (
-          <div className="mb-2">
-            <p className={`text-[11px] text-muted-foreground/80 leading-relaxed ${expanded ? "" : "line-clamp-2"}`}>
-              {bp.reason}
-            </p>
-            {bp.reason.length > 100 && (
-              <button
-                onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-                className="text-[10px] text-primary/70 hover:text-primary flex items-center gap-0.5 mt-0.5"
-              >
-                {expanded ? <><ChevronUp className="h-3 w-3" /> Less</> : <><ChevronDown className="h-3 w-3" /> More</>}
-              </button>
-            )}
-          </div>
-        )}
+        <div className="mb-2">
+          <p className={`text-[11px] text-muted-foreground/80 leading-relaxed ${expanded ? "" : "line-clamp-2"}`}>
+            {bp.reason || "AI analysis pending"}
+          </p>
+          {bp.reason && bp.reason.length > 100 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
+              className="text-[10px] text-primary/70 hover:text-primary flex items-center gap-0.5 mt-0.5"
+            >
+              {expanded ? <><ChevronUp className="h-3 w-3" /> Less</> : <><ChevronDown className="h-3 w-3" /> More</>}
+            </button>
+          )}
+        </div>
 
         {/* Lead-in + Ad slot duration */}
         <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
@@ -337,9 +335,7 @@ function ListView({
                   {bp.confidence !== null ? `${(bp.confidence * 100).toFixed(0)}%` : "—"}
                 </span>
               </div>
-              {bp.reason && (
-                <p className="text-[10px] text-muted-foreground/70 line-clamp-1">{bp.reason}</p>
-              )}
+              <p className="text-[10px] text-muted-foreground/70 line-clamp-1">{bp.reason || "AI analysis pending"}</p>
               <div className="flex items-center gap-3 mt-1 text-[9px] text-muted-foreground/50">
                 {bp.lead_in_sec != null && <span>{bp.lead_in_sec}s lead-in</span>}
                 {bp.ad_slot_duration_rec != null && <span>{bp.ad_slot_duration_rec}s ad slot</span>}
