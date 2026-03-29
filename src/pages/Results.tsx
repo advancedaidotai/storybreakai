@@ -717,7 +717,6 @@ interface ReadinessInfo {
   analysis: ReadinessState;
   edl: ReadinessState;
   ottJson: ReadinessState;
-  highlightReel: ReadinessState;
 }
 
 // ─── Detail Panel ────────────────────────────────────────────────────────────
@@ -756,7 +755,6 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, readines
             { key: "analysis" as const, label: "AI Analysis" },
             { key: "edl" as const, label: "EDL Export" },
             { key: "ottJson" as const, label: "OTT JSON" },
-            { key: "highlightReel" as const, label: "Highlight Reel" },
           ] as const).map(({ key, label }) => (
             <div key={key} className="flex items-center gap-2">
               <StatusIcon state={readiness[key]} />
@@ -908,6 +906,7 @@ const Results = () => {
   const navigate = useNavigate();
   const { projectId } = useParams<{ projectId: string }>();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const previewVideoRef = useRef<HTMLVideoElement>(null);
 
   const [loading, setLoading] = useState(true);
   const [segments, setSegments] = useState<Segment[]>([]);
@@ -917,6 +916,7 @@ const Results = () => {
   
   const [totalDuration, setTotalDuration] = useState(0);
   const [selected, setSelected] = useState<SelectedItem | null>(null);
+  const [previewPhase, setPreviewPhase] = useState<"idle" | "leadin" | "ad">("idle");
   const [projectInfo, setProjectInfo] = useState<ProjectInfo>({ title: "", content_type: null, content_metadata: null, delivery_target: null, duration_sec: null });
   const [chunks, setChunks] = useState<AnalysisChunk[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
@@ -986,7 +986,19 @@ const Results = () => {
   const handleSelectBreakpoint = useCallback((bp: Breakpoint) => { setSelected({ kind: "breakpoint", data: bp }); seekTo(bp.timestamp_sec); }, [seekTo]);
   const handleSelectHighlight = useCallback((hl: Highlight) => { setSelected({ kind: "highlight", data: hl }); seekTo(hl.start_sec); }, [seekTo]);
   const handleSelectAct = useCallback((act: SelectedItem) => { setSelected(act); if (act.kind === "act") seekTo(act.data.start_sec); }, [seekTo]);
-  const handleBreakpointCardClick = useCallback((bp: Breakpoint) => { setSelected({ kind: "breakpoint", data: bp }); seekTo(Math.max(0, bp.timestamp_sec - 10)); }, [seekTo]);
+  const handleBreakpointCardClick = useCallback((bp: Breakpoint) => {
+    setSelected({ kind: "breakpoint", data: bp });
+    setPreviewPhase("leadin");
+    const targetTime = Math.max(0, bp.timestamp_sec - 10);
+    if (previewVideoRef.current) {
+      previewVideoRef.current.currentTime = targetTime;
+      previewVideoRef.current.play().catch(() => {});
+    }
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = targetTime;
+    }
+  }, []);
 
   const handleExportJSON = useCallback(() => {
     const data = { segments, breakpoints, highlights };
@@ -1022,9 +1034,8 @@ const Results = () => {
 
     return {
       analysis: fetchError && !analysisOk ? "failed" : analysisOk ? "ready" : "unavailable",
-      edl: hasBreakpoints ? "ready" : analysisOk ? "unavailable" : "unavailable",
-      ottJson: hasBreakpoints ? "ready" : analysisOk ? "unavailable" : "unavailable",
-      highlightReel: "unavailable" as const, // reel generation disabled for stability
+      edl: hasBreakpoints ? "ready" : "unavailable",
+      ottJson: hasBreakpoints ? "ready" : "unavailable",
     };
   }, [segments, breakpoints, fetchError]);
 
@@ -1056,7 +1067,7 @@ const Results = () => {
       <div className="flex flex-col px-4 py-4 max-w-[1400px] mx-auto gap-4 animate-fade-in">
         <div className="h-14 rounded-2xl skeleton-shimmer" />
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_280px] gap-4">
-          <VideoSkeleton label="Source Video" /><VideoSkeleton label="AI Highlight Reel" />
+          <VideoSkeleton label="Source Video" /><VideoSkeleton label="HITL Ad Verifier" />
           <div className="glass-panel rounded-2xl p-4"><div className="h-3 w-24 rounded skeleton-shimmer mb-4" /><div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-3 rounded skeleton-shimmer" style={{ width: `${80 - i * 10}%` }} />)}</div></div>
         </div>
         <div className="h-48 rounded-2xl skeleton-shimmer" />
@@ -1098,13 +1109,47 @@ const Results = () => {
           </div>
         </div>
 
-        {/* Analysis Summary Panel */}
-        <div className="glass-panel rounded-2xl overflow-hidden cinematic-shadow fade-in-600 fade-in-delay-2">
-          <div className="aspect-video bg-primary/[0.02] flex flex-col items-center justify-center gap-3 p-6">
-            <Sparkles className="h-8 w-8 text-primary/40" />
-            <p className="text-sm font-semibold text-foreground">Analysis Complete! 🎬</p>
-            <p className="text-xs text-muted-foreground text-center">Here's what we found: {segments.length} scenes, {breakpoints.length} ad break opportunities, and {highlights.length} highlights.</p>
-          </div>
+        {/* HITL Ad-Break Previewer */}
+        <div className="glass-panel rounded-2xl overflow-hidden cinematic-shadow fade-in-600 fade-in-delay-2 relative">
+          {videoUrl ? (
+            <div className="relative">
+              <video
+                ref={previewVideoRef}
+                src={videoUrl}
+                className="w-full aspect-video bg-surface-0 object-contain"
+                muted={previewPhase === "idle"}
+                preload="metadata"
+                onTimeUpdate={() => {
+                  if (previewPhase === "leadin" && selected?.kind === "breakpoint" && previewVideoRef.current) {
+                    if (previewVideoRef.current.currentTime >= selected.data.timestamp_sec) {
+                      previewVideoRef.current.pause();
+                      setPreviewPhase("ad");
+                    }
+                  }
+                }}
+              />
+              {previewPhase === "ad" && (
+                <div className="absolute inset-0 bg-blue-950/95 flex flex-col items-center justify-center gap-3 animate-fade-in">
+                  <MonitorPlay className="h-12 w-12 text-blue-400 animate-pulse" />
+                  <h3 className="text-xl font-bold tracking-widest uppercase text-foreground">Commercial Break</h3>
+                  <p className="text-sm text-blue-200 font-mono">Simulated Ad Placement · 30s</p>
+                  <Badge variant="outline" className="border-blue-400/50 text-blue-300 bg-blue-900/50">Ad Council Placeholder</Badge>
+                  <button
+                    className="absolute top-3 right-3 h-7 w-7 rounded-lg bg-surface-2/60 flex items-center justify-center hover:bg-destructive/20 transition-colors"
+                    onClick={() => setPreviewPhase("idle")}
+                  >
+                    <span className="text-xs text-muted-foreground">✕</span>
+                  </button>
+                </div>
+              )}
+              <Badge variant="secondary" className="absolute top-2 left-2 text-[10px] bg-accent/90 border-0 text-accent-foreground pointer-events-none">HITL Ad Verifier</Badge>
+            </div>
+          ) : (
+            <div className="aspect-video bg-surface-0 flex flex-col items-center justify-center gap-2">
+              <MonitorPlay className="h-8 w-8 text-muted-foreground/40" />
+              <p className="text-xs text-muted-foreground">Click an ad break to preview</p>
+            </div>
+          )}
         </div>
 
         {/* Detail Panel + Scene Index */}

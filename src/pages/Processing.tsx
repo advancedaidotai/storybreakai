@@ -11,7 +11,6 @@ const STEPS = [
   { key: "uploaded", label: "Getting your video ready...", icon: CloudUpload },
   { key: "analyzing", label: "Finding the story beats...", icon: Brain },
   { key: "segments_done", label: "Mapping scene boundaries...", icon: Layers },
-  { key: "highlights_done", label: "Spotting the best moments...", icon: Sparkles },
 ] as const;
 
 function statusToStepIndex(status: ProjectStatus): number {
@@ -20,8 +19,7 @@ function statusToStepIndex(status: ProjectStatus): number {
     case "uploaded": return 0;
     case "analyzing": return 1;
     case "segments_done": return 2;
-    case "highlights_done": return 4;
-    case "generating_reel": case "ready": case "complete": return 5;
+    case "highlights_done": case "ready": case "complete": return 3;
     case "failed": return -2;
     default: return -1;
   }
@@ -97,7 +95,7 @@ const Processing = () => {
       const newStatus = data.status as ProjectStatus;
       setStatus(newStatus);
 
-      if (newStatus === "complete" || newStatus === "ready") {
+      if (newStatus === "complete" || newStatus === "ready" || newStatus === "highlights_done") {
         navigate(`/results/${projectId}`, { replace: true });
         return;
       }
@@ -161,14 +159,6 @@ const Processing = () => {
       });
   }, [projectId, status]);
 
-  // Skip reel generation — navigate to results once highlights are done
-  useEffect(() => {
-    if (!projectId) return;
-    if (status === "highlights_done" || status === "ready") {
-      console.log("[Processing] Analysis complete — navigating to results");
-      navigate(`/results/${projectId}`, { replace: true });
-    }
-  }, [projectId, status, navigate]);
 
   // Generate thumbnail timestamps periodically from video
   useEffect(() => {
