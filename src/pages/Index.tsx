@@ -153,6 +153,7 @@ const Index = () => {
   const [urlValid, setUrlValid] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [codecWarning, setCodecWarning] = useState<string | null>(null);
+  const [codecBlocked, setCodecBlocked] = useState(false);
 
   const config = CONTENT_CONFIGS[contentType];
 
