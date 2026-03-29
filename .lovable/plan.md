@@ -1,24 +1,41 @@
 
 
-## Update Delivery Target Options
+## Fix: Recent Project Click Navigation
 
-**What changes**: Update the delivery target dropdown in `src/pages/Index.tsx` to include OTT as a separate option and add a recommended "Streaming/SVOD" option.
+### Problem
+Currently clicking a recent project card has inconsistent behavior:
+- "uploaded"/"draft" projects navigate to `/` (home page) with no context — user loses track
+- "failed" projects go to results page but don't clearly offer reanalysis
+- All statuses should route users to see their data and offer appropriate actions
 
-### Current options (line 473-475):
-- `broadcast` — Broadcast / Master · Act structures
-- `cable_vod` — Cable / VOD · 8-12 min intervals
-- `youtube` — YouTube · 3-5 min intervals
+### Changes
 
-### New options:
-- `broadcast` — Broadcast · Act-break structures (22/44 min)
-- `cable` — Cable · 8-12 min intervals
-- `ott` — OTT / Streaming · Flexible mid-rolls ⭐ Recommended
-- `youtube` — YouTube · 3-5 min intervals
+**File: `src/components/RecentProjects.tsx` — Update `handleClick` in `ProjectCard`**
 
-### Files to edit:
-1. **`src/pages/Index.tsx`** — Replace the three `<option>` elements (lines 473-475) with four updated options. Update default state from `"broadcast"` to keep as-is. Update the `SAMPLE_VIDEO` constant's `delivery_target` if desired.
+Change the routing logic:
+1. **"analyzing" / "generating_reel" / "segments_done"** → `/processing/:id` (unchanged, correct)
+2. **"uploaded"** → `/processing/:id` (sends user to processing page which auto-triggers analysis)
+3. **"draft"** → Stay on `/` but no longer show misleading "pre-filling form" toast. Just show a toast saying the project needs setup.
+4. **"complete" / "ready" / "highlights_done" / "failed"** → `/results/:id` (unchanged — results page already has retry button for failed analysis)
 
-2. **`src/pages/Results.tsx`** — Update the OTT manifest fallback on line 127 from `"broadcast"` to remain `"broadcast"` (no change needed, it's just a fallback).
+This is a minimal change: just move "uploaded" from the home-redirect group into the processing-redirect group, and simplify the draft toast.
 
-No database migration needed — `delivery_target` is a free-text column.
+### Technical Detail
+
+In `handleClick` (~line 94-106), change:
+```typescript
+// Before
+if (s === "uploaded" || s === "draft") {
+  navigate("/");
+}
+
+// After  
+if (s === "uploaded") {
+  navigate(`/processing/${project.id}`);
+} else if (s === "draft") {
+  navigate("/");
+}
+```
+
+The processing page already auto-triggers analysis for "uploaded" status projects (line 150-173 of Processing.tsx), so this correctly resumes the workflow. The results page already has export/download buttons and a retry mechanism for failed analyses.
 
