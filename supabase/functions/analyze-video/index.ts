@@ -1,7 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { BedrockRuntimeClient, InvokeModelCommand } from "npm:@aws-sdk/client-bedrock-runtime";
-import { S3Client } from "npm:@aws-sdk/client-s3";
-import { Upload } from "npm:@aws-sdk/lib-storage";
+import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3";
+import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner";
 import { GetCallerIdentityCommand, STSClient } from "npm:@aws-sdk/client-sts";
 
 const corsHeaders = {
@@ -481,7 +481,7 @@ async function ensureS3Uri(
   const s3Uri = `s3://${s3Bucket}/${s3Key}`;
 
   console.log(`[analyze-video] Streaming video from URL to S3: ${currentUri.slice(0, 200)}`);
-  const MAX_DOWNLOAD_SIZE = 10_737_418_240; // 10 GB
+  const MAX_DOWNLOAD_SIZE = 5_368_709_120; // 5 GB (presigned PUT limit)
   const dlResp = await fetch(currentUri);
   if (!dlResp.ok) {
     throw new Error(`Failed to download video (${dlResp.status}): ${currentUri.slice(0, 200)}`);
@@ -490,7 +490,7 @@ async function ensureS3Uri(
   if (contentLength) {
     const size = parseInt(contentLength, 10);
     if (size > MAX_DOWNLOAD_SIZE) {
-      throw new Error(`Video file too large (${(size / 1_073_741_824).toFixed(1)} GB). Maximum allowed is 10 GB.`);
+      throw new Error(`Video file too large (${(size / 1_073_741_824).toFixed(1)} GB). Maximum allowed is 5 GB.`);
     }
   } else {
     console.warn(`[analyze-video] No Content-Length header for video URL, proceeding without size check`);
@@ -509,28 +509,27 @@ async function ensureS3Uri(
     },
   });
 
-  const upload = new Upload({
-    client: s3Client,
-    params: {
-      Bucket: s3Bucket,
-      Key: s3Key,
-      Body: dlResp.body,
-      ContentType: contentType,
-    },
-    queueSize: 4,
-    partSize: 10 * 1024 * 1024, // 10 MB parts
+  // Use presigned URL to avoid per-part SHA-256 hashing (CPU killer in edge functions)
+  const presignedUrl = await getSignedUrl(s3Client, new PutObjectCommand({
+    Bucket: s3Bucket,
+    Key: s3Key,
+    ContentType: contentType,
+  }), { expiresIn: 3600 });
+
+  console.log(`[analyze-video] Generated presigned URL, streaming upload...`);
+
+  const uploadResp = await fetch(presignedUrl, {
+    method: "PUT",
+    body: dlResp.body,
+    headers: { "Content-Type": contentType },
   });
 
-  upload.on("httpUploadProgress", (progress: any) => {
-    if (progress.loaded) {
-      console.log(`[analyze-video] S3 upload progress: ${(progress.loaded / 1024 / 1024).toFixed(1)} MB`);
-    }
-  });
+  if (!uploadResp.ok) {
+    const errText = await uploadResp.text();
+    throw new Error(`S3 presigned upload failed (${uploadResp.status}): ${errText.slice(0, 500)}`);
+  }
 
-  await upload.done();
-  console.log(`[analyze-video] Streamed to S3: ${s3Uri}`);
-
-  console.log(`[analyze-video] Uploaded to S3: ${s3Uri}`);
+  console.log(`[analyze-video] Uploaded to S3 via presigned URL: ${s3Uri}`);
 
   // Update the video record with the new S3 URI
   const { error: updateErr } = await supabase
