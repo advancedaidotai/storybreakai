@@ -82,6 +82,10 @@ function normalizeKnownAnalysisError(message: string): string {
     return "This video can't be processed by the AI model in its current format. Please re-encode it to H.264 video + AAC audio in an MP4 container, then retry.";
   }
 
+  if (msg.includes("s3location not found") || msg.includes("video file not found in storage")) {
+    return "The video file could not be found in storage. It may have been deleted or the upload didn't complete. Please re-upload the video and try again.";
+  }
+
   if (msg.includes("failed to download video (404)")) {
     return "The video URL is not reachable (404). Please verify the exact direct video URL and try again.";
   }
