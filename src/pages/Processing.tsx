@@ -1,9 +1,20 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Check, Loader2, AlertCircle, RefreshCw, CloudUpload, Brain, Layers, Sparkles, Film, Clock } from "lucide-react";
+import { Check, Loader2, AlertCircle, RefreshCw, CloudUpload, Brain, Layers, Sparkles, Film, Clock, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type ProjectStatus = "draft" | "uploaded" | "uploading" | "analyzing" | "segments_done" | "highlights_done" | "breakpoints_done" | "merging" | "generating_reel" | "ready" | "complete" | "failed";
 
@@ -458,8 +469,39 @@ const Processing = () => {
         </div>
       )}
 
-      <div className="flex items-center justify-center w-full max-w-sm mt-8">
+      <div className="flex items-center justify-center gap-3 w-full max-w-sm mt-8">
         <Button variant="ghost" size="sm" className="text-xs h-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => navigate("/")}>← Start Over</Button>
+
+        {!isFailed && status !== "draft" && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="ghost" size="sm" className="text-xs h-8 rounded-lg text-muted-foreground hover:text-destructive gap-1.5">
+                <XCircle className="h-3.5 w-3.5" /> Cancel Analysis
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent className="glass-panel-elevated border-border/30 max-w-sm">
+              <AlertDialogHeader>
+                <AlertDialogTitle className="text-foreground">Cancel Analysis?</AlertDialogTitle>
+                <AlertDialogDescription className="text-muted-foreground text-sm">
+                  This will stop the current analysis and mark the project as failed. You can retry later or start a new project. Any partial results will be discarded.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="rounded-lg text-xs">Keep Running</AlertDialogCancel>
+                <AlertDialogAction
+                  className="rounded-lg text-xs bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={async () => {
+                    await supabase.from("projects").update({ status: "failed" as any }).eq("id", projectId);
+                    setStatus("failed");
+                    setError("Analysis was cancelled.");
+                  }}
+                >
+                  Cancel Analysis
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </div>
     </div>
   );
