@@ -841,7 +841,7 @@ Deno.serve(async (req) => {
       }
 
       // ── Process ONE chunk ──────────────────────────────────────
-      const chunk = nextPending;
+      const chunk = currentPending;
       const chunkNum = chunk.chunk_index;
       const totalMin = Math.round(durationSec / 60);
 
