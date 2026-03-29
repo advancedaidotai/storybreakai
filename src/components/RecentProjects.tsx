@@ -1,6 +1,27 @@
+import { useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Clock, Film, Tv, Clapperboard, AlertCircle, Loader2, ChevronRight } from "lucide-react";
+import { Clock, Film, Tv, Clapperboard, Loader2, MoreVertical, Archive, Trash2 } from "lucide-react";
 import { useRecentProjects, type RecentProject } from "@/hooks/useRecentProjects";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 function getProjectDisplayTitle(p: RecentProject): string {
   const meta = p.content_metadata as Record<string, any> | null;
@@ -35,6 +56,8 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   draft: { label: "Draft", className: "bg-muted/30 text-muted-foreground border-border/20" },
 };
 
+const ACTIVE_STATUSES = ["analyzing", "generating_reel", "segments_done"];
+
 function StatusBadge({ status }: { status: string }) {
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG.draft;
   return (
@@ -55,9 +78,18 @@ function ContentTypeBadge({ type }: { type: string | null }) {
   );
 }
 
-function ProjectCard({ project }: { project: RecentProject }) {
+function ProjectCard({
+  project,
+  onArchive,
+  onRequestDelete,
+}: {
+  project: RecentProject;
+  onArchive: (id: string) => void;
+  onRequestDelete: (project: RecentProject) => void;
+}) {
   const navigate = useNavigate();
   const title = getProjectDisplayTitle(project);
+  const isActive = ACTIVE_STATUSES.includes(project.status);
 
   const handleClick = () => {
     const s = project.status;
@@ -69,11 +101,54 @@ function ProjectCard({ project }: { project: RecentProject }) {
   };
 
   return (
-    <button
-      onClick={handleClick}
-      className="flex-shrink-0 w-[220px] rounded-xl border border-border/15 p-4 text-left transition-all duration-200 hover:border-primary/30 hover:bg-primary/[0.03] group cursor-pointer"
+    <div
+      className="relative flex-shrink-0 w-[220px] rounded-xl border border-border/15 p-4 text-left transition-all duration-200 hover:border-primary/30 hover:bg-primary/[0.03] group cursor-pointer"
       style={{ backgroundColor: "hsl(222 25% 11%)" }}
+      onClick={handleClick}
     >
+      {/* Kebab menu */}
+      <div className="absolute top-2 right-2 z-10" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="h-7 w-7 flex items-center justify-center rounded-lg opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/5">
+              <MoreVertical className="h-3.5 w-3.5 text-muted-foreground" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuItem
+              onClick={() => onArchive(project.id)}
+              className="gap-2 text-xs text-muted-foreground cursor-pointer"
+            >
+              <Archive className="h-3.5 w-3.5" />
+              Archive
+            </DropdownMenuItem>
+            {isActive ? (
+              <TooltipProvider delayDuration={0}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground/40 cursor-not-allowed">
+                      <Trash2 className="h-3.5 w-3.5" />
+                      Delete
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="text-xs">
+                    Cannot delete while analysis is in progress
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            ) : (
+              <DropdownMenuItem
+                onClick={() => onRequestDelete(project)}
+                className="gap-2 text-xs text-destructive focus:text-destructive cursor-pointer"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+
       {/* Thumbnail placeholder */}
       <div className="h-20 rounded-lg mb-3 flex items-center justify-center" style={{ background: "linear-gradient(135deg, hsl(222 30% 14%), hsl(222 25% 18%))" }}>
         <Film className="h-6 w-6 text-muted-foreground/25" />
@@ -88,12 +163,80 @@ function ProjectCard({ project }: { project: RecentProject }) {
       </div>
 
       <p className="text-[10px] text-muted-foreground/50 mt-2">{relativeTime(project.created_at)}</p>
-    </button>
+    </div>
   );
 }
 
 export default function RecentProjects() {
   const { data: projects, isLoading, error } = useRecentProjects();
+  const queryClient = useQueryClient();
+  const [deleteTarget, setDeleteTarget] = useState<RecentProject | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const optimisticRemove = useCallback(
+    (id: string) => {
+      queryClient.setQueryData<RecentProject[]>(["recent-projects"], (old) =>
+        old ? old.filter((p) => p.id !== id) : []
+      );
+    },
+    [queryClient]
+  );
+
+  const optimisticRestore = useCallback(
+    (project: RecentProject) => {
+      queryClient.setQueryData<RecentProject[]>(["recent-projects"], (old) => {
+        if (!old) return [project];
+        const exists = old.some((p) => p.id === project.id);
+        if (exists) return old;
+        return [...old, project].sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+      });
+    },
+    [queryClient]
+  );
+
+  const handleArchive = useCallback(
+    async (id: string) => {
+      const project = projects?.find((p) => p.id === id);
+      optimisticRemove(id);
+      toast({ title: "Project archived" });
+
+      const { error: err } = await supabase
+        .from("projects")
+        .update({ status: "archived" as any })
+        .eq("id", id);
+
+      if (err) {
+        if (project) optimisticRestore(project);
+        toast({ title: "Failed to archive", description: err.message, variant: "destructive" });
+      }
+    },
+    [projects, optimisticRemove, optimisticRestore]
+  );
+
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTarget) return;
+    const project = deleteTarget;
+    setDeleting(true);
+    optimisticRemove(project.id);
+    setDeleteTarget(null);
+
+    // Delete cascade: related tables first, then project
+    const tables = ["analysis_logs", "analysis_chunks", "exports", "highlights", "breakpoints", "segments", "videos"] as const;
+    for (const table of tables) {
+      await supabase.from(table).delete().eq("project_id", project.id);
+    }
+    const { error: err } = await supabase.from("projects").delete().eq("id", project.id);
+
+    if (err) {
+      optimisticRestore(project);
+      toast({ title: "Failed to delete", description: err.message, variant: "destructive" });
+    } else {
+      toast({ title: "Project deleted" });
+    }
+    setDeleting(false);
+  }, [deleteTarget, optimisticRemove, optimisticRestore]);
 
   if (isLoading) {
     return (
@@ -106,7 +249,7 @@ export default function RecentProjects() {
     );
   }
 
-  if (error) return null; // Silently fail — not critical
+  if (error) return null;
 
   if (!projects || projects.length === 0) {
     return (
@@ -125,9 +268,36 @@ export default function RecentProjects() {
       <SectionHeader />
       <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-border/20 scrollbar-track-transparent">
         {projects.map((p) => (
-          <ProjectCard key={p.id} project={p} />
+          <ProjectCard
+            key={p.id}
+            project={p}
+            onArchive={handleArchive}
+            onRequestDelete={setDeleteTarget}
+          />
         ))}
       </div>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Project?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete this project and all associated data (video, segments, breakpoints, highlights, exports). This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+            >
+              {deleting ? "Deleting…" : "Delete Permanently"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
