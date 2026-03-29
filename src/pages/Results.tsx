@@ -1100,6 +1100,44 @@ const Results = () => {
     navigate(`/processing/${projectId}`);
   }, [projectId, navigate]);
 
+  const reAnalyzeChanged = reDeliveryTarget !== (projectInfo.delivery_target || "ott") || reContentType !== (projectInfo.content_type || "short_form");
+
+  const handleReAnalyze = useCallback(async () => {
+    if (!projectId) return;
+    setReAnalyzing(true);
+    try {
+      // 1. Delete stale derived rows
+      const deletes = await Promise.all([
+        supabase.from("analysis_chunks").delete().eq("project_id", projectId),
+        supabase.from("segments").delete().eq("project_id", projectId),
+        supabase.from("breakpoints").delete().eq("project_id", projectId),
+        supabase.from("highlights").delete().eq("project_id", projectId),
+      ]);
+      const delErr = deletes.find((d) => d.error);
+      if (delErr?.error) throw new Error(`Cleanup failed: ${delErr.error.message}`);
+
+      // 2. Update project with new settings + reset status
+      const { error: updateErr } = await supabase
+        .from("projects")
+        .update({
+          delivery_target: reDeliveryTarget,
+          content_type: reContentType as any,
+          status: "uploaded" as any,
+        })
+        .eq("id", projectId);
+      if (updateErr) throw new Error(`Update failed: ${updateErr.message}`);
+
+      toast({ title: "Re-analyzing with new settings…", description: "Redirecting to processing." });
+      setReAnalyzeOpen(false);
+      navigate(`/processing/${projectId}`);
+    } catch (err: any) {
+      console.error("[ReAnalyze]", err);
+      toast({ title: "Re-analysis failed", description: err?.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setReAnalyzing(false);
+    }
+  }, [projectId, reDeliveryTarget, reContentType, navigate]);
+
   if (!projectId) return <DemoResults />;
 
   if (fetchError && !loading && segments.length === 0 && breakpoints.length === 0) {
