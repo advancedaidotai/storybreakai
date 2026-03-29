@@ -317,7 +317,6 @@ const Processing = () => {
             {thumbTimestamps.map((t) => (
               <div key={t} className="relative aspect-video rounded-lg overflow-hidden bg-surface-0 border border-border/10">
                 <video
-                  ref={videoRef}
                   src={`${videoUrl}#t=${t}`}
                   className="w-full h-full object-cover"
                   muted

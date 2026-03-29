@@ -11,10 +11,24 @@ interface BusinessCaseProps {
   highlightCount: number;
 }
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 export function BusinessCaseButton(props: BusinessCaseProps) {
   const handleDownload = () => {
     const { projectTitle, contentType, deliveryTarget, durationSec, segmentCount, breakpointCount, highlightCount } = props;
     const dur = durationSec ? `${Math.floor(durationSec / 60)}m ${Math.floor(durationSec % 60)}s` : "N/A";
+
+    const safeTitle = escapeHtml(projectTitle || "Untitled Project");
+    const safeContentType = escapeHtml(contentType?.replace("_", " ") || "N/A");
+    const safeDeliveryTarget = escapeHtml(deliveryTarget || "N/A");
+    const safeDur = escapeHtml(dur);
 
     const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>StoryBreak AI - Business Case</title>
@@ -40,14 +54,14 @@ td:last-child{color:#c9d1d9;font-weight:500}
 .logo{font-size:20px;font-weight:700;color:#58a6ff}
 </style></head><body>
 <div class="logo">StoryBreak AI</div>
-<h1>${projectTitle || "Untitled Project"}</h1>
-<p class="subtitle">Business Case Report · Generated ${new Date().toLocaleDateString()}</p>
+<h1>${safeTitle}</h1>
+<p class="subtitle">Business Case Report · Generated ${escapeHtml(new Date().toLocaleDateString())}</p>
 
 <h2>Project Metadata</h2>
 <table>
-<tr><td>Content Type</td><td>${contentType?.replace("_", " ") || "N/A"}</td></tr>
-<tr><td>Delivery Target</td><td>${deliveryTarget || "N/A"}</td></tr>
-<tr><td>Duration</td><td>${dur}</td></tr>
+<tr><td>Content Type</td><td>${safeContentType}</td></tr>
+<tr><td>Delivery Target</td><td>${safeDeliveryTarget}</td></tr>
+<tr><td>Duration</td><td>${safeDur}</td></tr>
 <tr><td>Scenes Detected</td><td>${segmentCount}</td></tr>
 <tr><td>Ad Breakpoints</td><td>${breakpointCount}</td></tr>
 <tr><td>Highlights</td><td>${highlightCount}</td></tr>

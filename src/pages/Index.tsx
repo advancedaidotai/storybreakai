@@ -185,8 +185,8 @@ const Index = () => {
     setError("Upload cancelled.");
   }, []);
 
-  // Validate video URL
-  const handleLoadVideoUrl = useCallback(async () => {
+  // Validate video URL (syntax only — backend will verify access)
+  const handleLoadVideoUrl = useCallback(() => {
     const trimmed = videoUrl.trim();
     if (!trimmed) {
       setUrlError("Please enter a video URL");
@@ -196,25 +196,9 @@ const Index = () => {
       setUrlError("That doesn't look like a valid video URL. Please check and try again.");
       return;
     }
-    setUrlValidating(true);
     setUrlError(null);
-    setUrlValid(false);
-
-    try {
-      // Try a HEAD request to verify the URL is accessible
-      const response = await fetch(trimmed, { method: "HEAD", mode: "no-cors" });
-      // no-cors won't give us status, but if it doesn't throw, the URL is likely reachable
-      setUrlValid(true);
-      setUrlError(null);
-      toast({ title: "Video URL loaded!", description: "Your video link is ready for analysis." });
-    } catch {
-      // Even if HEAD fails due to CORS, we still accept the URL - the backend will fetch it
-      setUrlValid(true);
-      setUrlError(null);
-      toast({ title: "Video URL accepted", description: "We'll verify access when analysis starts." });
-    } finally {
-      setUrlValidating(false);
-    }
+    setUrlValid(true);
+    toast({ title: "Video URL accepted", description: "We'll verify access when analysis starts." });
   }, [videoUrl]);
 
   const uploadMultipart = useCallback(async (file: File, projectId: string) => {
@@ -252,11 +236,11 @@ const Index = () => {
       setProgress((p) => ({ ...p, completedParts: completedParts.length, bytesUploaded }));
     };
 
-    let idx = 0;
     const runNext = async (): Promise<void> => {
-      while (idx < queue.length) {
+      while (true) {
         if (abortRef.current) throw new Error("Cancelled");
-        const partNum = queue[idx++];
+        const partNum = queue.shift();
+        if (partNum === undefined) break;
         await uploadPart(partNum);
       }
     };
@@ -268,6 +252,7 @@ const Index = () => {
       throw new Error("Cancelled");
     }
 
+    completedParts.sort((a, b) => a.part_number - b.part_number);
     const { data: completeData, error: completeErr } = await supabase.functions.invoke("multipart-upload", {
       body: { action: "complete", s3_key, upload_id, parts: completedParts },
     });
@@ -566,7 +551,7 @@ const Index = () => {
           <div className={`${panelStyle} p-5`} style={{ backgroundColor: panelBg }}>
             <div className="flex items-center gap-2.5 mb-4">
               <StepBadge n={3} />
-              <h3 className="text-sm font-semibold text-foreground"><h3 className="text-sm font-semibold text-foreground">Where will this be distributed?</h3></h3>
+              <h3 className="text-sm font-semibold text-foreground">Where will this be distributed?</h3>
             </div>
             <div>
               <label className="block text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/70 mb-1.5">
