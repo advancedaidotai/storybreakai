@@ -76,24 +76,27 @@ const Processing = () => {
   // Poll project status + chunk progress + metadata
   useEffect(() => {
     if (!projectId) return;
+    const isMounted = { current: true };
 
     // Fetch project metadata once
     supabase.from("projects").select("title, content_metadata, content_type, duration_sec").eq("id", projectId).single()
-      .then(({ data }) => { if (data) setProjectMeta(data as ProjectMeta); });
+      .then(({ data }) => { if (isMounted.current && data) setProjectMeta(data as ProjectMeta); });
 
     // Fetch video URL
     supabase.from("videos").select("s3_uri, original_filename").eq("project_id", projectId).limit(1).single()
       .then(({ data }) => {
-        if (data?.s3_uri && !data.s3_uri.startsWith("s3://")) {
+        if (isMounted.current && data?.s3_uri && !data.s3_uri.startsWith("s3://")) {
           setVideoUrl(data.s3_uri);
         }
       });
 
     const poll = async () => {
+      if (!isMounted.current) return;
       const { data, error: fetchErr } = await supabase.from("projects").select("status").eq("id", projectId).single();
-      if (fetchErr || !data) return;
+      if (fetchErr || !data || !isMounted.current) return;
 
       const newStatus = data.status as ProjectStatus;
+      if (!isMounted.current) return;
       setStatus(newStatus);
 
       if (newStatus === "complete" || newStatus === "ready" || newStatus === "highlights_done") {
@@ -109,6 +112,7 @@ const Processing = () => {
           .eq("project_id", projectId)
           .order("chunk_index");
 
+        if (!isMounted.current) return;
         if (chunks && chunks.length > 0) {
           const completed = chunks.filter((c: any) => c.status === "complete").length;
           const analyzingChunk = chunks.find((c: any) => c.status === "analyzing");
@@ -126,12 +130,13 @@ const Processing = () => {
         .from("segments")
         .select("id", { count: "exact", head: true })
         .eq("project_id", projectId);
+      if (!isMounted.current) return;
       if (count !== null) setScenesFound(count);
     };
 
     poll();
     const interval = setInterval(poll, 3000);
-    return () => clearInterval(interval);
+    return () => { isMounted.current = false; clearInterval(interval); };
   }, [projectId, navigate]);
 
   // Auto-trigger analyze-video when status = uploaded
