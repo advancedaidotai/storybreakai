@@ -643,6 +643,9 @@ const Index = () => {
           </div>
         </div>
       </div>
+
+      {/* Recent Projects */}
+      <RecentProjects />
     </div>
   );
 };
