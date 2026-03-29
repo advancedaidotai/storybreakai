@@ -83,6 +83,28 @@ Deno.serve(async (req) => {
       );
     }
 
+    // URL mode: user provided a direct video URL, skip file upload
+    if (s3_uri_override && !is_sample) {
+      const { error: vidErr } = await supabase.from("videos").insert({
+        project_id: project.id,
+        original_filename: filename,
+        s3_uri: s3_uri_override,
+        duration_sec: duration_sec ?? null,
+      });
+
+      if (vidErr) {
+        return new Response(JSON.stringify({ error: "Failed to create video record", details: vidErr.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(
+        JSON.stringify({ project_id: project.id, s3_uri: s3_uri_override }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Regular upload flow — use official AWS SDK for presigning
     const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY");
     const awsSecretKey = Deno.env.get("AWS_SECRET_KEY");
