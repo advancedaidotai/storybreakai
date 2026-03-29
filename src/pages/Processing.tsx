@@ -104,8 +104,26 @@ const Processing = () => {
   useEffect(() => {
     if (!projectId || status !== "uploaded" || triggeredAnalyze.current) return;
     triggeredAnalyze.current = true;
+    console.log("[Processing] Triggering analyze-video for", projectId);
     supabase.functions.invoke("analyze-video", { body: { project_id: projectId } })
-      .then(({ error: fnErr }) => { if (fnErr) console.error("[Processing] analyze-video error:", fnErr.message); });
+      .then(({ data, error: fnErr }) => {
+        if (fnErr) {
+          console.error("[Processing] analyze-video invoke error:", fnErr.message);
+          setError(`Analysis failed to start: ${fnErr.message}`);
+          setStatus("failed");
+        } else if (data?.error) {
+          console.error("[Processing] analyze-video returned error:", data.error);
+          setError(`Analysis error: ${data.error}`);
+          setStatus("failed");
+        } else {
+          console.log("[Processing] analyze-video invoked successfully");
+        }
+      })
+      .catch((err: any) => {
+        console.error("[Processing] analyze-video unexpected error:", err);
+        setError("Failed to connect to analysis service. Please retry.");
+        setStatus("failed");
+      });
   }, [projectId, status]);
 
   // Auto-trigger generate-reel
@@ -113,8 +131,26 @@ const Processing = () => {
     if (!projectId || triggeredReel.current) return;
     if (status === "ready" || status === "highlights_done") {
       triggeredReel.current = true;
+      console.log("[Processing] Triggering generate-reel for", projectId);
       supabase.functions.invoke("generate-reel", { body: { project_id: projectId } })
-        .then(({ error: fnErr }) => { if (fnErr) console.error("[Processing] generate-reel error:", fnErr.message); });
+        .then(({ data, error: fnErr }) => {
+          if (fnErr) {
+            console.error("[Processing] generate-reel invoke error:", fnErr.message);
+            setError(`Reel generation failed: ${fnErr.message}`);
+            setStatus("failed");
+          } else if (data?.error) {
+            console.error("[Processing] generate-reel returned error:", data.error);
+            setError(`Reel error: ${data.error}`);
+            setStatus("failed");
+          } else {
+            console.log("[Processing] generate-reel invoked successfully");
+          }
+        })
+        .catch((err: any) => {
+          console.error("[Processing] generate-reel unexpected error:", err);
+          setError("Failed to connect to reel service. Please retry.");
+          setStatus("failed");
+        });
     }
   }, [projectId, status]);
 
@@ -222,7 +258,9 @@ const Processing = () => {
             <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
             <div className="flex-1">
               <p className="font-semibold text-xs text-destructive uppercase tracking-wide">Processing Failed</p>
-              <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">An error occurred during analysis. This could be a temporary issue — try again.</p>
+              <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                {error || "An error occurred during analysis. This could be a temporary issue — try again."}
+              </p>
               <Button size="sm" variant="outline" className="mt-3 text-xs h-8 rounded-lg gap-2 border-destructive/30 hover:bg-destructive/10 text-destructive" onClick={handleRetry} disabled={retrying}>
                 <RefreshCw className={`h-3 w-3 ${retrying ? "animate-spin" : ""}`} />
                 {retrying ? "Restarting…" : "Retry Analysis"}
