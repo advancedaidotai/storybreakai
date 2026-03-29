@@ -1,5 +1,5 @@
-import { useNavigate } from "react-router-dom";
-import { useState, useRef, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { CloudUpload, Film, AlertCircle, X, Loader2, Tv, Clapperboard, XCircle, Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
