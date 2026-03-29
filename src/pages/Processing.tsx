@@ -71,6 +71,7 @@ const Processing = () => {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [scenesFound, setScenesFound] = useState(0);
   const [thumbTimestamps, setThumbTimestamps] = useState<number[]>([]);
+  const [elapsedSec, setElapsedSec] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Poll project status + chunk progress + metadata
