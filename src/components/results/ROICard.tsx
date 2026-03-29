@@ -27,7 +27,7 @@ export function ROICard({ durationSec, contentType, deliveryTarget }: ROICardPro
   const METRICS = [
     { icon: Clock, label: "Time Saved", value: `~${timeSaved.toFixed(1)} hrs`, sub: "vs manual scene logging", color: "text-primary" },
     { icon: DollarSign, label: "Cost Reduction", value: `~$${costSaved}`, sub: `at $${HOURLY_RATE}/hr rate`, color: "text-segment" },
-    { icon: Target, label: "Accuracy", value: "94.7%", sub: "scene boundary detection", color: "text-highlight" },
+    { icon: Target, label: "Accuracy", value: "~95%", sub: "estimated benchmark", color: "text-highlight" },
   ];
 
   return (

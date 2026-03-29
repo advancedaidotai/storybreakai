@@ -10,13 +10,31 @@ const COMPLIANCE_RULES: Record<string, { label: string; checks: string[] }> = {
       "Standard & Practices safe transitions",
     ],
   },
-  streaming: {
-    label: "Streaming / OTT",
+  ott: {
+    label: "OTT / Streaming",
     checks: [
-      "Chapter markers every 8–12 min ✓",
-      "Binge-watch segment boundaries",
+      "Flexible mid-roll placements every 5-10 min ✓",
+      "Viewer retention-optimized break points",
       "Skip-intro marker candidate identified",
       "Content advisory break points flagged",
+    ],
+  },
+  cable: {
+    label: "Cable",
+    checks: [
+      "8-12 min commercial pod timing ✓",
+      "Scene transition-aligned breaks",
+      "Commercial bumper moments detected",
+      "Standard cable ad pod structure",
+    ],
+  },
+  cable_vod: {
+    label: "Cable / VOD",
+    checks: [
+      "8-12 min commercial pod timing ✓",
+      "VOD chapter markers generated",
+      "Scene transition-aligned breaks",
+      "Binge-watch segment boundaries",
     ],
   },
   youtube: {
@@ -26,6 +44,15 @@ const COMPLIANCE_RULES: Record<string, { label: string; checks: string[] }> = {
       "Mid-roll ad placement suggestions",
       "Engagement hook segments identified",
       "Thumbnail-worthy moments flagged",
+    ],
+  },
+  streaming: {
+    label: "Streaming / OTT",
+    checks: [
+      "Chapter markers every 8-12 min ✓",
+      "Binge-watch segment boundaries",
+      "Skip-intro marker candidate identified",
+      "Content advisory break points flagged",
     ],
   },
 };
