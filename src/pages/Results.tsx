@@ -730,8 +730,9 @@ interface ReadinessInfo {
 
 // ─── Detail Panel ────────────────────────────────────────────────────────────
 
-function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, readiness, onRetry }: {
+function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, onDownloadFormat, readiness, onRetry }: {
   selected: SelectedItem | null; onExportJSON: () => void; onDownloadMasterPackage: () => void;
+  onDownloadFormat: (fmt: "edl" | "fcpxml" | "premiere" | "ott") => void;
   readiness: ReadinessInfo; onRetry: () => void;
 }) {
   return (
