@@ -325,8 +325,8 @@ async function callPegasus(
         inputPrompt: prompt,
         mediaSource: {
           s3Location: {
-            bucketName: s3Uri.replace("s3://", "").split("/")[0],
-            objectKey: s3Uri.replace("s3://", "").split("/").slice(1).join("/"),
+            uri: s3Uri,
+            bucketOwner: awsAccountId,
           },
         },
       }),
