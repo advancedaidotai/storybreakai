@@ -411,7 +411,12 @@ Deno.serve(async (req) => {
             },
           });
 
-          const analysis = await callPegasus(prompt);
+          const { result: analysis, logs: chunkLogs } = await callPegasus(prompt, projectId);
+          await flushLogs(supabase, chunkLogs);
+
+          if (analysis.segments.length === 0) {
+            logs_warn: console.warn(`[analyze-video] Chunk ${chunkNum} returned 0 valid segments after normalization`);
+          }
 
           await supabase.from("analysis_chunks").update({
             status: "complete",
