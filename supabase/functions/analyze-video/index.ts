@@ -462,9 +462,19 @@ async function ensureS3Uri(
   const s3Uri = `s3://${s3Bucket}/${s3Key}`;
 
   console.log(`[analyze-video] Streaming video from URL to S3: ${currentUri.slice(0, 200)}`);
+  const MAX_DOWNLOAD_SIZE = 10_737_418_240; // 10 GB
   const dlResp = await fetch(currentUri);
   if (!dlResp.ok) {
     throw new Error(`Failed to download video (${dlResp.status}): ${currentUri.slice(0, 200)}`);
+  }
+  const contentLength = dlResp.headers.get("content-length");
+  if (contentLength) {
+    const size = parseInt(contentLength, 10);
+    if (size > MAX_DOWNLOAD_SIZE) {
+      throw new Error(`Video file too large (${(size / 1_073_741_824).toFixed(1)} GB). Maximum allowed is 10 GB.`);
+    }
+  } else {
+    console.warn(`[analyze-video] No Content-Length header for video URL, proceeding without size check`);
   }
   if (!dlResp.body) {
     throw new Error(`No response body from video URL`);
