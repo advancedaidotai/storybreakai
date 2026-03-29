@@ -147,6 +147,7 @@ function mergeHighlights(chunks: ChunkData[]): Highlight[] {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "GET") return new Response(JSON.stringify({ status: "ok", function: "merge-analysis-chunks" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   let projectId: string | undefined;
