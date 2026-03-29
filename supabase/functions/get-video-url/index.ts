@@ -36,9 +36,13 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unsupported URI scheme" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY")!;
-    const awsSecretKey = Deno.env.get("AWS_SECRET_KEY")!;
-    const region = Deno.env.get("BEDROCK_REGION") || "us-east-1";
+    const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY");
+    const awsSecretKey = Deno.env.get("AWS_SECRET_KEY");
+    if (!awsAccessKey || !awsSecretKey) {
+      console.error("[get-video-url] Missing AWS credentials: AWS_ACCESS_KEY or AWS_SECRET_KEY not set");
+      return new Response(JSON.stringify({ error: "Server misconfiguration: AWS credentials not set" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    const region = Deno.env.get("S3_REGION") || Deno.env.get("BEDROCK_REGION") || "us-east-1";
 
     const rest = s3Uri.slice(5);
     const slashIdx = rest.indexOf("/");

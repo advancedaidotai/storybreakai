@@ -896,13 +896,14 @@ const Results = () => {
       setLoading(true);
       setFetchError(null);
       try {
-        const [projRes, vidRes, segRes, bpRes, hlRes, chunkRes] = await Promise.all([
+        const [projRes, vidRes, segRes, bpRes, hlRes, chunkRes, videoUrlRes] = await Promise.all([
           supabase.from("projects").select("title, content_type, content_metadata, delivery_target, duration_sec").eq("id", projectId).single(),
           supabase.from("videos").select("s3_uri, duration_sec").eq("project_id", projectId).single(),
           supabase.from("segments").select("*").eq("project_id", projectId).order("start_sec"),
           supabase.from("breakpoints").select("*").eq("project_id", projectId).order("timestamp_sec"),
           supabase.from("highlights").select("*").eq("project_id", projectId).order("score", { ascending: false }),
           supabase.from("analysis_chunks").select("id, chunk_index, start_sec, end_sec, overlap_start_sec, overlap_end_sec").eq("project_id", projectId).order("chunk_index"),
+          supabase.functions.invoke("get-video-url", { body: { project_id: projectId } }).catch((err) => { console.error("[Results] Failed to get video URL:", err); return { data: null }; }),
         ]);
 
         if (projRes.error) {
@@ -915,13 +916,8 @@ const Results = () => {
         if (projRes.data) setProjectInfo(projRes.data as ProjectInfo);
         if (vidRes.data) {
           setTotalDuration(Number(vidRes.data.duration_sec) || 0);
-          // Fetch presigned URL for private S3 video
-          supabase.functions.invoke("get-video-url", { body: { project_id: projectId } })
-            .then(({ data: urlData }) => {
-              if (urlData?.url) setVideoUrl(urlData.url);
-            })
-            .catch((err) => console.error("[Results] Failed to get video URL:", err));
         }
+        if (videoUrlRes?.data?.url) setVideoUrl(videoUrlRes.data.url);
         if (segRes.data) setSegments(segRes.data as Segment[]);
         if (bpRes.data) setBreakpoints(bpRes.data as Breakpoint[]);
         if (hlRes.data) setHighlights(hlRes.data as Highlight[]);
