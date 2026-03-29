@@ -45,9 +45,12 @@ function formatTimeRange(startSec: number, endSec: number) {
   return `${fmt(startSec)} – ${fmt(endSec)}`;
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const Processing = () => {
   const navigate = useNavigate();
-  const { projectId } = useParams<{ projectId: string }>();
+  const { projectId: rawId } = useParams<{ projectId: string }>();
+  const projectId = rawId && UUID_RE.test(rawId) ? rawId : undefined;
   const [status, setStatus] = useState<ProjectStatus>("uploaded");
   const [error, setError] = useState<string | null>(null);
   const [retrying, setRetrying] = useState(false);
