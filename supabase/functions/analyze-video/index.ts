@@ -98,10 +98,13 @@ function validateAndClean(raw: unknown): AnalysisResult {
   const breakpoints: RawBreakpoint[] = obj.breakpoints.map((b: any, i: number) => {
     if (typeof b.timestamp_sec !== "number") throw new Error(`Breakpoint ${i}: missing timestamp_sec`);
     return {
-      timestamp_sec: b.timestamp_sec, type: typeof b.type === "string" ? b.type : "natural_pause", reason: typeof b.reason === "string" ? b.reason : null,
-      confidence: typeof b.confidence === "number" ? b.confidence : null, lead_in_sec: typeof b.lead_in_sec === "number" ? b.lead_in_sec : null,
-      valley_type: VALLEY_TYPES.includes(b.valley_type) ? b.valley_type : null, ad_slot_duration_rec: typeof b.ad_slot_duration_rec === "number" ? b.ad_slot_duration_rec : null,
-      compliance_notes: typeof b.compliance_notes === "string" ? b.compliance_notes : null,
+      timestamp_sec: b.timestamp_sec, type: typeof b.type === "string" ? b.type : "natural_pause",
+      reason: typeof b.reason === "string" ? b.reason : "Natural narrative pause detected",
+      confidence: typeof b.confidence === "number" ? b.confidence : 0.5,
+      lead_in_sec: typeof b.lead_in_sec === "number" ? b.lead_in_sec : 3,
+      valley_type: VALLEY_TYPES.includes(b.valley_type) ? b.valley_type : "scene_transition",
+      ad_slot_duration_rec: typeof b.ad_slot_duration_rec === "number" ? b.ad_slot_duration_rec : 30,
+      compliance_notes: typeof b.compliance_notes === "string" ? b.compliance_notes : "No specific compliance flags",
     };
   });
 
