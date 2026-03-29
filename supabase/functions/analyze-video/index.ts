@@ -700,26 +700,50 @@ async function ensureS3Uri(
 
   const parts: { ETag: string; PartNumber: number }[] = [];
   let partNumber = 1;
-  let buffer = new Uint8Array(0);
+  const pendingChunks: Uint8Array[] = [];
+  let pendingBytes = 0;
   let totalUploaded = 0;
+
+  const drainBytes = (size: number): Uint8Array => {
+    const out = new Uint8Array(size);
+    let offset = 0;
+
+    while (offset < size) {
+      const nextChunk = pendingChunks[0];
+      if (!nextChunk) {
+        throw new Error(`[analyze-video] Internal upload buffer underflow (needed ${size}, got ${offset})`);
+      }
+
+      const needed = size - offset;
+      if (nextChunk.length <= needed) {
+        out.set(nextChunk, offset);
+        offset += nextChunk.length;
+        pendingChunks.shift();
+      } else {
+        out.set(nextChunk.subarray(0, needed), offset);
+        pendingChunks[0] = nextChunk.subarray(needed);
+        offset += needed;
+      }
+    }
+
+    pendingBytes -= size;
+    return out;
+  };
 
   const reader = dlResp.body.getReader();
   try {
     while (true) {
       const { done, value } = await reader.read();
 
-      if (value) {
-        // Append to buffer
-        const newBuf = new Uint8Array(buffer.length + value.length);
-        newBuf.set(buffer);
-        newBuf.set(value, buffer.length);
-        buffer = newBuf;
+      if (value && value.length > 0) {
+        pendingChunks.push(value);
+        pendingBytes += value.length;
       }
 
-      // Upload parts when buffer reaches PART_SIZE or stream ends
-      while (buffer.length >= PART_SIZE || (done && buffer.length > 0)) {
-        const chunk = buffer.length >= PART_SIZE ? buffer.slice(0, PART_SIZE) : buffer;
-        buffer = buffer.length >= PART_SIZE ? buffer.slice(PART_SIZE) : new Uint8Array(0);
+      // Upload parts when accumulated bytes reach PART_SIZE or stream ends
+      while (pendingBytes >= PART_SIZE || (done && pendingBytes > 0)) {
+        const currentPartSize = pendingBytes >= PART_SIZE ? PART_SIZE : pendingBytes;
+        const chunk = drainBytes(currentPartSize);
 
         const uploadPartResp = await s3Client.send(new UploadPartCommand({
           Bucket: s3Bucket,
@@ -734,7 +758,7 @@ async function ensureS3Uri(
         console.log(`[analyze-video] Uploaded part ${partNumber} (${(chunk.length / 1_048_576).toFixed(1)} MB, total ${(totalUploaded / 1_048_576).toFixed(1)} MB)`);
         partNumber++;
 
-        if (done && buffer.length === 0) break;
+        if (done && pendingBytes === 0) break;
       }
 
       if (done) break;
