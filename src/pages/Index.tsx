@@ -301,7 +301,58 @@ const Index = () => {
   const handleDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(false); }, []);
   const handleDrop = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(false); handleFileSelect(e.dataTransfer.files); }, [handleFileSelect]);
 
-  const isBusy = uploadState !== "idle";
+  // Hidden keyboard shortcut: Ctrl+Shift+D toggles demo mode
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === "D") {
+        e.preventDefault();
+        setDemoMode((prev) => {
+          const next = !prev;
+          toast({ title: next ? "Demo mode activated" : "Demo mode deactivated", description: next ? "Sample video trigger is now visible." : "Hidden again." });
+          return next;
+        });
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  const handleRunDemo = useCallback(async () => {
+    setDemoLoading(true);
+    setError(null);
+    try {
+      console.log("[Demo] Starting sample project pipeline…");
+      const { data, error: fnErr } = await supabase.functions.invoke("upload-video", {
+        body: {
+          filename: SAMPLE_VIDEO.filename,
+          content_type: "video/mp4",
+          file_size: 0,
+          duration_sec: SAMPLE_VIDEO.duration_sec,
+          is_sample: true,
+          s3_uri_override: SAMPLE_VIDEO.s3_uri,
+          content_type_enum: SAMPLE_VIDEO.content_type_enum,
+          content_metadata: { title: SAMPLE_VIDEO.title },
+          delivery_target: SAMPLE_VIDEO.delivery_target,
+        },
+      });
+
+      if (fnErr || !data?.project_id) {
+        throw new Error(data?.error || fnErr?.message || "Failed to create sample project");
+      }
+
+      console.log("[Demo] Sample project created:", data.project_id);
+      toast({ title: "Demo project created", description: `Project ${data.project_id.slice(0, 8)}… — navigating to processing.` });
+      navigate(`/processing/${data.project_id}`);
+    } catch (err: any) {
+      console.error("[Demo] Failed:", err);
+      setError(`Demo failed: ${err.message}`);
+      toast({ title: "Demo failed", description: err.message, variant: "destructive" });
+    } finally {
+      setDemoLoading(false);
+    }
+  }, [navigate]);
+
+  const isBusy = uploadState !== "idle" || demoLoading;
 
   const panelStyle = "rounded-xl border border-border/15";
   const panelBg = "hsl(222 25% 11%)";
