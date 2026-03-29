@@ -608,20 +608,27 @@ const Index = () => {
               </div>
             )}
 
-            {/* Upload button */}
-            <Button
-              size="lg"
-              className="w-full rounded-xl h-12 text-sm font-semibold btn-hover disabled:opacity-40 disabled:shadow-none"
-              style={{ background: formValid && !isBusy ? "linear-gradient(135deg, hsl(187 92% 42%), hsl(217 91% 55%))" : undefined }}
-              disabled={!formValid || isBusy}
-              onClick={() => { setTouched(true); if (formValid) handleUpload(); }}
-            >
-              {isBusy ? (
-                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Processing…</>
-              ) : (
-                <><CloudUpload className="h-4 w-4 mr-2" /> Upload & Analyze</>
+            {/* Upload button with validation tooltip */}
+            <div className="relative group/upload">
+              <Button
+                size="lg"
+                className="w-full rounded-xl h-12 text-sm font-semibold btn-hover disabled:opacity-40 disabled:shadow-none"
+                style={{ background: formValid && !isBusy ? "linear-gradient(135deg, hsl(187 92% 42%), hsl(217 91% 55%))" : undefined }}
+                disabled={!formValid || isBusy}
+                onClick={() => { setTouched(true); if (formValid) handleUpload(); }}
+              >
+                {isBusy ? (
+                  <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Processing…</>
+                ) : (
+                  <><CloudUpload className="h-4 w-4 mr-2" /> Upload & Analyze</>
+                )}
+              </Button>
+              {!formValid && !isBusy && (
+                <div className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap opacity-0 group-hover/upload:opacity-100 transition-opacity bg-popover border border-border/30 text-[11px] text-muted-foreground px-3 py-1.5 rounded-lg shadow-lg pointer-events-none z-20">
+                  {!selectedFile && !titleValid ? "Please select a video file and enter a title" : !selectedFile ? "Please select a video file" : "Please enter a title"}
+                </div>
               )}
-            </Button>
+            </div>
 
             <p className="text-[10px] text-muted-foreground/40 text-center leading-relaxed">
               By clicking, you agree to our Content Security Policy for secure media processing.
