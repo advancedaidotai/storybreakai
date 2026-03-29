@@ -815,7 +815,10 @@ Deno.serve(async (req) => {
         retriedChunks!.forEach((c: any) => allChunks.push(c));
       }
 
-      if (!nextPending) {
+      // Re-derive nextPending from (potentially updated) allChunks
+      const currentPending = allChunks.find((c: any) => c.status === "pending" || c.status === "analyzing");
+
+      if (!currentPending) {
         // All chunks complete — trigger merge
         console.log(`[analyze-video] All ${totalChunks} chunks complete — dispatching merge for project ${projectId}`);
         await supabase.from("projects").update({ status: "segments_done" }).eq("id", projectId);
