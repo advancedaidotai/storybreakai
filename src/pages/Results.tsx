@@ -793,7 +793,7 @@ const Results = () => {
       setLoading(true);
       setFetchError(null);
       try {
-        const [projRes, vidRes, segRes, bpRes, hlRes, expRes, chunkRes] = await Promise.all([
+        const [projRes, vidRes, segRes, bpRes, hlRes, chunkRes] = await Promise.all([
           supabase.from("projects").select("title, content_type, content_metadata, delivery_target, duration_sec").eq("id", projectId).single(),
           supabase.from("videos").select("s3_uri, duration_sec").eq("project_id", projectId).single(),
           supabase.from("segments").select("*").eq("project_id", projectId).order("start_sec"),
@@ -814,7 +814,6 @@ const Results = () => {
         if (segRes.data) setSegments(segRes.data as Segment[]);
         if (bpRes.data) setBreakpoints(bpRes.data as Breakpoint[]);
         if (hlRes.data) setHighlights(hlRes.data as Highlight[]);
-        if (expRes.data?.[0]?.file_url) setReelUrl(expRes.data[0].file_url);
         if (chunkRes.data) setChunks(chunkRes.data as AnalysisChunk[]);
 
         // Warn if no analysis data found
