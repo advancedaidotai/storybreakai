@@ -1108,7 +1108,19 @@ const Results = () => {
         {/* Source Video */}
         <div className="glass-panel rounded-2xl overflow-hidden cinematic-shadow fade-in-600 fade-in-delay-1">
           <div className="relative">
-            {videoUrl ? <video ref={videoRef} src={videoUrl} className="w-full aspect-video bg-surface-0 object-contain" controls preload="metadata" /> : <div className="aspect-video bg-surface-0 flex items-center justify-center"><Play className="h-6 w-6 text-muted-foreground/40" /></div>}
+            {videoUrl ? (
+              videoError ? (
+                <div className="aspect-video bg-surface-0 flex flex-col items-center justify-center gap-3">
+                  <AlertCircle className="h-6 w-6 text-destructive/60" />
+                  <p className="text-xs text-muted-foreground">Video unavailable</p>
+                  <Button variant="outline" size="sm" className="text-xs rounded-lg gap-1.5" onClick={() => { setVideoError(false); setVideoUrl(videoUrl); }}>
+                    <RefreshCw className="h-3 w-3" /> Retry
+                  </Button>
+                </div>
+              ) : (
+                <video ref={videoRef} src={videoUrl} className="w-full aspect-video bg-surface-0 object-contain" controls preload="metadata" onError={() => setVideoError(true)} />
+              )
+            ) : <div className="aspect-video bg-surface-0 flex items-center justify-center"><Play className="h-6 w-6 text-muted-foreground/40" /></div>}
             <Badge variant="secondary" className="absolute top-2 left-2 text-[10px] bg-surface-1/90 border-0 text-muted-foreground pointer-events-none">Source Video</Badge>
           </div>
         </div>

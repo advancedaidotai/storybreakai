@@ -228,11 +228,7 @@ export default function RecentProjects() {
     optimisticRemove(project.id);
     setDeleteTarget(null);
 
-    // Delete cascade: related tables first, then project
-    const tables = ["analysis_logs", "analysis_chunks", "exports", "highlights", "breakpoints", "segments", "videos"] as const;
-    for (const table of tables) {
-      await supabase.from(table).delete().eq("project_id", project.id);
-    }
+    // CASCADE deletes handle related tables automatically
     const { error: err } = await supabase.from("projects").delete().eq("id", project.id);
 
     if (err) {
