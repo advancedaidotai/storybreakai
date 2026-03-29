@@ -811,10 +811,11 @@ interface ReadinessInfo {
 
 // ─── Detail Panel ────────────────────────────────────────────────────────────
 
-function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, onDownloadFormat, readiness, onRetry }: {
+function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, onDownloadFormat, readiness, onRetry, exportApprovedOnly, onToggleApprovedOnly }: {
   selected: SelectedItem | null; onExportJSON: () => void; onDownloadMasterPackage: () => void;
   onDownloadFormat: (fmt: "edl" | "fcpxml" | "premiere" | "ott") => void;
   readiness: ReadinessInfo; onRetry: () => void;
+  exportApprovedOnly: boolean; onToggleApprovedOnly: () => void;
 }) {
   return (
     <div className="glass-panel rounded-2xl p-4 flex flex-col gap-4 h-fit lg:sticky lg:top-16 overflow-auto">
