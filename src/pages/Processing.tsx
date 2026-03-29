@@ -74,6 +74,12 @@ const Processing = () => {
   const [elapsedSec, setElapsedSec] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
 
+  // Track elapsed time for timeout warnings
+  useEffect(() => {
+    const timer = setInterval(() => setElapsedSec((s) => s + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   // Poll project status + chunk progress + metadata
   useEffect(() => {
     if (!projectId) return;
