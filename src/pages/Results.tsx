@@ -966,6 +966,7 @@ const Results = () => {
   const [reDeliveryTarget, setReDeliveryTarget] = useState("");
   const [reContentType, setReContentType] = useState("");
   const [reAnalyzing, setReAnalyzing] = useState(false);
+  const [reAnalyzeConfirm, setReAnalyzeConfirm] = useState(false);
 
   // Sync modal defaults when project loads
   useEffect(() => {
