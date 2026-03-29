@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { BedrockRuntimeClient, InvokeModelCommand } from "npm:@aws-sdk/client-bedrock-runtime";
-import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, HeadObjectCommand } from "npm:@aws-sdk/client-s3";
 import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner";
 import { STSClient, GetCallerIdentityCommand } from "npm:@aws-sdk/client-sts";
 
@@ -82,6 +82,10 @@ function normalizeKnownAnalysisError(message: string): string {
     return "This video can't be processed by the AI model in its current format. Please re-encode it to H.264 video + AAC audio in an MP4 container, then retry.";
   }
 
+  if (msg.includes("s3location not found") || msg.includes("video file not found in storage")) {
+    return "The video file could not be found in storage. It may have been deleted or the upload didn't complete. Please re-upload the video and try again.";
+  }
+
   if (msg.includes("failed to download video (404)")) {
     return "The video URL is not reachable (404). Please verify the exact direct video URL and try again.";
   }
@@ -98,6 +102,8 @@ function normalizeKnownAnalysisError(message: string): string {
 }
 
 function isKnownAnalysisInputError(message: string): boolean {
+  const msg = message.toLowerCase();
+  if (msg.includes("s3location not found") || msg.includes("video file not found in storage")) return true;
   const msg = message.toLowerCase();
   return (
     msg.includes("unprocessable video") ||
@@ -445,6 +451,25 @@ async function callPegasus(
     throw new Error(`Pegasus requires an s3:// video URI, received: ${s3Uri.slice(0, 120)}`);
   }
 
+  // Parse bucket and key from s3:// URI
+  const s3Parts = s3Uri.replace("s3://", "").split("/");
+  const checkBucket = s3Parts[0];
+  const checkKey = s3Parts.slice(1).join("/");
+  const s3Region = Deno.env.get("S3_REGION") || bedrockRegion;
+
+  // Pre-flight: verify file exists in S3 before sending to Bedrock
+  const s3Client = new S3Client({
+    region: s3Region,
+    credentials: { accessKeyId: awsAccessKey, secretAccessKey: awsSecretKey },
+  });
+  try {
+    await s3Client.send(new HeadObjectCommand({ Bucket: checkBucket, Key: checkKey }));
+    console.log(`[analyze-video] S3 pre-flight OK: ${s3Uri}`);
+  } catch (headErr: any) {
+    console.error(`[analyze-video] S3 pre-flight FAILED for ${s3Uri}:`, headErr?.message || headErr);
+    throw new Error(`Video file not found in storage (${s3Uri}). The upload may have failed or the file was deleted. Please re-upload and try again.`);
+  }
+
   const awsAccountId = await getAwsAccountId(awsAccessKey, awsSecretKey, bedrockRegion);
 
   const bedrockClient = new BedrockRuntimeClient({
@@ -483,9 +508,12 @@ async function callPegasus(
       clearTimeout(timeout);
       const errMsg = err?.message || String(err);
 
-      // Check for non-retryable Bedrock errors (video codec/duration issues)
+      // Check for non-retryable Bedrock errors
       if (errMsg.includes("Unprocessable video") || errMsg.includes("error_code\":400")) {
         throw new Error(`Video format not supported by AI model. The video may use an unsupported codec (try H.264/MP4) or exceed the maximum duration per analysis pass. Original error: ${errMsg}`);
+      }
+      if (errMsg.includes("S3Location not found") || errMsg.includes("Provided S3Location")) {
+        throw new Error(`S3Location not found — the video file could not be accessed by the AI model. Please re-upload the video and try again.`);
       }
 
       if (!isRetry) {
