@@ -1130,15 +1130,9 @@ const Results = () => {
           <ContentHeader project={projectInfo} segments={segments} breakpoints={breakpoints} highlights={highlights} />
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <BusinessCaseButton
-            projectTitle={projectInfo.title}
-            contentType={projectInfo.content_type}
-            deliveryTarget={projectInfo.delivery_target}
-            durationSec={projectInfo.duration_sec}
-            segmentCount={segments.length}
-            breakpointCount={breakpoints.length}
-            highlightCount={highlights.length}
-          />
+          <Button variant="outline" size="sm" className="text-xs rounded-lg gap-1.5 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover shrink-0" onClick={() => setReAnalyzeOpen(true)}>
+            <RefreshCw className="h-3.5 w-3.5" /> Re-Analyze
+          </Button>
           <Button variant="ghost" size="sm" className="text-xs rounded-lg text-muted-foreground btn-hover shrink-0" onClick={() => navigate("/")}>← New Analysis</Button>
         </div>
       </div>
