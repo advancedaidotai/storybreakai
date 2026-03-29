@@ -839,15 +839,21 @@ const Index = () => {
               )}
             </div>
 
-            {/* Codec warning */}
+            {/* Codec warning / error */}
             {codecWarning && !error && (
-              <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-400">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div className={`flex items-start gap-3 p-3.5 rounded-xl border ${
+                codecBlocked
+                  ? "bg-destructive/10 border-destructive/25 text-destructive"
+                  : "bg-amber-500/10 border-amber-500/25 text-amber-400"
+              }`}>
+                {codecBlocked ? <XCircle className="h-4 w-4 shrink-0 mt-0.5" /> : <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />}
                 <div className="flex-1">
-                  <p className="text-xs font-semibold mb-0.5">Codec Compatibility Warning</p>
+                  <p className="text-xs font-semibold mb-0.5">{codecBlocked ? "Unsupported Video Format" : "Codec Compatibility Warning"}</p>
                   <p className="text-[11px] leading-relaxed opacity-80">{codecWarning}</p>
                 </div>
-                <button onClick={() => setCodecWarning(null)} className="shrink-0 hover:opacity-70 transition-opacity"><X className="h-3.5 w-3.5" /></button>
+                {!codecBlocked && (
+                  <button onClick={() => setCodecWarning(null)} className="shrink-0 hover:opacity-70 transition-opacity"><X className="h-3.5 w-3.5" /></button>
+                )}
               </div>
             )}
 
