@@ -2,7 +2,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
 import {
-  Play, Sparkles, Star, Download, FileJson, Zap, Loader2,
+  Play, Sparkles, Star, FileJson, Zap, Loader2,
   MessageCircle, ArrowRightLeft, Heart, Film, Package,
   Clock, Shield, Timer, Minus, Plus, ChevronLeft, ChevronRight,
   List, Diamond, MonitorPlay, Clapperboard, AlertCircle,
