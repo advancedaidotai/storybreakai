@@ -6,6 +6,26 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// ─── Normalization helpers ───────────────────────────────────────────────────
+
+function clamp01(value: number): number {
+  if (typeof value !== "number" || isNaN(value)) return 0.5;
+  return Math.max(0, Math.min(1, value));
+}
+
+interface AnalysisLog {
+  project_id: string;
+  log_type: string;
+  message: string;
+  raw_data?: unknown;
+}
+
+async function flushLogs(supabase: any, logs: AnalysisLog[]) {
+  if (logs.length === 0) return;
+  const { error } = await supabase.from("analysis_logs").insert(logs);
+  if (error) console.error(`[analyze-video] Failed to flush ${logs.length} analysis logs:`, error.message);
+}
+
 // ─── AWS Signature V4 helpers ────────────────────────────────────────────────
 
 function hmacSHA256(key: Uint8Array, msg: string): Promise<ArrayBuffer> {
