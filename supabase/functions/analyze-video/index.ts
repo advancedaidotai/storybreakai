@@ -103,37 +103,89 @@ interface RawBreakpoint { timestamp_sec: number; type: string; reason?: string; 
 interface RawHighlight { start_sec: number; end_sec: number; score: number; reason?: string; rank_order?: number; }
 interface AnalysisResult { segments: RawSegment[]; breakpoints: RawBreakpoint[]; highlights: RawHighlight[]; }
 
-function validateAndClean(raw: unknown): AnalysisResult {
+function validateAndClean(raw: unknown, projectId: string): { result: AnalysisResult; logs: AnalysisLog[] } {
+  const logs: AnalysisLog[] = [];
   if (!raw || typeof raw !== "object") throw new Error("Response is not an object");
   const obj = raw as Record<string, unknown>;
-  if (!Array.isArray(obj.segments) || obj.segments.length === 0) throw new Error("Missing or empty segments array");
-  if (!Array.isArray(obj.breakpoints) || obj.breakpoints.length === 0) throw new Error("Missing or empty breakpoints array");
-  if (!Array.isArray(obj.highlights) || obj.highlights.length === 0) throw new Error("Missing or empty highlights array");
+  if (!Array.isArray(obj.segments)) throw new Error("Missing segments array");
+  if (!Array.isArray(obj.breakpoints)) throw new Error("Missing breakpoints array");
+  if (!Array.isArray(obj.highlights)) throw new Error("Missing highlights array");
 
-  const segments: RawSegment[] = obj.segments.map((s: any, i: number) => {
-    if (typeof s.start_sec !== "number" || typeof s.end_sec !== "number") throw new Error(`Segment ${i}: missing start_sec/end_sec`);
-    return { start_sec: s.start_sec, end_sec: s.end_sec, type: SEGMENT_TYPES.includes(s.type) ? s.type : "story_unit", summary: typeof s.summary === "string" ? s.summary : null, confidence: typeof s.confidence === "number" ? s.confidence : null };
-  });
+  // ── Segments: filter invalid, clamp confidence ──
+  const segments: RawSegment[] = [];
+  for (let i = 0; i < obj.segments.length; i++) {
+    const s = obj.segments[i] as any;
+    if (typeof s.start_sec !== "number" || typeof s.end_sec !== "number" || s.end_sec <= s.start_sec) {
+      logs.push({ project_id: projectId, log_type: "skipped_segment", message: `Segment ${i}: invalid time range (start=${s.start_sec}, end=${s.end_sec})`, raw_data: s });
+      continue;
+    }
+    const rawConf = typeof s.confidence === "number" ? s.confidence : null;
+    const clampedConf = rawConf !== null ? clamp01(rawConf) : null;
+    if (rawConf !== null && rawConf !== clampedConf) {
+      logs.push({ project_id: projectId, log_type: "clamped_score", message: `Segment ${i}: confidence clamped from ${rawConf} to ${clampedConf}`, raw_data: { original: rawConf, clamped: clampedConf } });
+    }
+    segments.push({
+      start_sec: s.start_sec, end_sec: s.end_sec,
+      type: SEGMENT_TYPES.includes(s.type) ? s.type : "story_unit",
+      summary: typeof s.summary === "string" ? s.summary : null,
+      confidence: clampedConf,
+    });
+  }
 
-  const breakpoints: RawBreakpoint[] = obj.breakpoints.map((b: any, i: number) => {
-    if (typeof b.timestamp_sec !== "number") throw new Error(`Breakpoint ${i}: missing timestamp_sec`);
-    return {
+  // ── Breakpoints: filter invalid, clamp confidence ──
+  const breakpoints: RawBreakpoint[] = [];
+  for (let i = 0; i < obj.breakpoints.length; i++) {
+    const b = obj.breakpoints[i] as any;
+    if (typeof b.timestamp_sec !== "number" || b.timestamp_sec <= 0) {
+      logs.push({ project_id: projectId, log_type: "skipped_breakpoint", message: `Breakpoint ${i}: invalid timestamp_sec (${b.timestamp_sec})`, raw_data: b });
+      continue;
+    }
+    const rawConf = typeof b.confidence === "number" ? b.confidence : 0.5;
+    const clampedConf = clamp01(rawConf);
+    if (rawConf !== clampedConf) {
+      logs.push({ project_id: projectId, log_type: "clamped_score", message: `Breakpoint ${i}: confidence clamped from ${rawConf} to ${clampedConf}`, raw_data: { original: rawConf, clamped: clampedConf } });
+    }
+    breakpoints.push({
       timestamp_sec: b.timestamp_sec, type: typeof b.type === "string" ? b.type : "natural_pause",
       reason: typeof b.reason === "string" ? b.reason : "Natural narrative pause detected",
-      confidence: typeof b.confidence === "number" ? b.confidence : 0.5,
+      confidence: clampedConf,
       lead_in_sec: typeof b.lead_in_sec === "number" ? b.lead_in_sec : 3,
       valley_type: VALLEY_TYPES.includes(b.valley_type) ? b.valley_type : "scene_transition",
       ad_slot_duration_rec: typeof b.ad_slot_duration_rec === "number" ? b.ad_slot_duration_rec : 30,
       compliance_notes: typeof b.compliance_notes === "string" ? b.compliance_notes : "No specific compliance flags",
-    };
-  });
+    });
+  }
 
-  const highlights: RawHighlight[] = obj.highlights.map((h: any, i: number) => {
-    if (typeof h.start_sec !== "number" || typeof h.end_sec !== "number") throw new Error(`Highlight ${i}: missing start_sec/end_sec`);
-    return { start_sec: h.start_sec, end_sec: h.end_sec, score: typeof h.score === "number" ? h.score : 0, reason: typeof h.reason === "string" ? h.reason : null, rank_order: typeof h.rank_order === "number" ? h.rank_order : i + 1 };
-  });
+  // ── Highlights: filter invalid, clamp score ──
+  const highlights: RawHighlight[] = [];
+  for (let i = 0; i < obj.highlights.length; i++) {
+    const h = obj.highlights[i] as any;
+    if (typeof h.start_sec !== "number" || typeof h.end_sec !== "number" || h.end_sec <= h.start_sec) {
+      logs.push({ project_id: projectId, log_type: "skipped_highlight", message: `Highlight ${i}: invalid time range (start=${h.start_sec}, end=${h.end_sec})`, raw_data: h });
+      continue;
+    }
+    const rawScore = typeof h.score === "number" ? h.score : 0;
+    // Normalize: if score looks like 0-100 range, convert to 0-1
+    const normalizedScore = rawScore > 1 ? rawScore / 100 : rawScore;
+    const clampedScore = clamp01(normalizedScore);
+    if (rawScore !== clampedScore) {
+      logs.push({ project_id: projectId, log_type: "clamped_score", message: `Highlight ${i}: score normalized from ${rawScore} to ${clampedScore}`, raw_data: { original: rawScore, clamped: clampedScore } });
+    }
+    highlights.push({
+      start_sec: h.start_sec, end_sec: h.end_sec, score: clampedScore,
+      reason: typeof h.reason === "string" ? h.reason : null,
+      rank_order: typeof h.rank_order === "number" ? h.rank_order : i + 1,
+    });
+  }
 
-  return { segments, breakpoints, highlights };
+  if (segments.length === 0) {
+    logs.push({ project_id: projectId, log_type: "parse_error", message: "AI returned no valid segments after normalization", raw_data: { original_count: obj.segments.length } });
+  }
+
+  logs.push({ project_id: projectId, log_type: "info", message: `Normalization complete: ${segments.length} segments, ${breakpoints.length} breakpoints, ${highlights.length} highlights (filtered ${obj.segments.length - segments.length}s, ${obj.breakpoints.length - breakpoints.length}b, ${obj.highlights.length - highlights.length}h)` });
+
+  return { result: { segments, breakpoints, highlights }, logs };
+}
 }
 
 function extractJSON(text: string): unknown {
