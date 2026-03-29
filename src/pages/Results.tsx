@@ -678,13 +678,44 @@ function BreakpointStoryboard({ breakpoints, selected, currentTime, onCardClick 
   );
 }
 
+// ─── Readiness Status ────────────────────────────────────────────────────────
+
+type ReadinessState = "ready" | "unavailable" | "failed";
+
+function StatusIcon({ state }: { state: ReadinessState }) {
+  if (state === "ready") return <CheckCircle2 className="h-3.5 w-3.5 text-segment shrink-0" />;
+  if (state === "failed") return <XCircle className="h-3.5 w-3.5 text-destructive shrink-0" />;
+  return <Ban className="h-3.5 w-3.5 text-muted-foreground/40 shrink-0" />;
+}
+
+function statusLabel(state: ReadinessState) {
+  if (state === "ready") return "Ready";
+  if (state === "failed") return "Failed";
+  return "Unavailable";
+}
+
+function statusColor(state: ReadinessState) {
+  if (state === "ready") return "text-segment";
+  if (state === "failed") return "text-destructive";
+  return "text-muted-foreground/50";
+}
+
+interface ReadinessInfo {
+  analysis: ReadinessState;
+  edl: ReadinessState;
+  ottJson: ReadinessState;
+  highlightReel: ReadinessState;
+}
+
 // ─── Detail Panel ────────────────────────────────────────────────────────────
 
-function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage }: {
+function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, readiness, onRetry }: {
   selected: SelectedItem | null; onExportJSON: () => void; onDownloadMasterPackage: () => void;
+  readiness: ReadinessInfo; onRetry: () => void;
 }) {
   return (
     <div className="glass-panel rounded-2xl p-4 flex flex-col gap-4 h-fit lg:sticky lg:top-16 overflow-auto">
+      {/* Element Detail */}
       <div>
         <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">{selected ? "Element Detail" : "Select an Element"}</h3>
         {!selected ? (
@@ -703,11 +734,41 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage }: {
           </div>
         ) : null}
       </div>
+
+      {/* Readiness States */}
+      <div className="border-t border-border/20 pt-4">
+        <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">Pipeline Status</h3>
+        <div className="space-y-2">
+          {([
+            { key: "analysis" as const, label: "AI Analysis" },
+            { key: "edl" as const, label: "EDL Export" },
+            { key: "ottJson" as const, label: "OTT JSON" },
+            { key: "highlightReel" as const, label: "Highlight Reel" },
+          ] as const).map(({ key, label }) => (
+            <div key={key} className="flex items-center gap-2">
+              <StatusIcon state={readiness[key]} />
+              <span className="text-[11px] text-foreground/80 flex-1">{label}</span>
+              <span className={`text-[10px] font-medium ${statusColor(readiness[key])}`}>{statusLabel(readiness[key])}</span>
+            </div>
+          ))}
+        </div>
+        {readiness.analysis === "failed" && (
+          <Button variant="outline" size="sm" className="w-full mt-3 gap-2 rounded-xl text-xs h-7 border-destructive/30 text-destructive hover:bg-destructive/10" onClick={onRetry}>
+            <AlertCircle className="h-3 w-3" /> Retry Analysis
+          </Button>
+        )}
+      </div>
+
+      {/* Export Actions */}
       <div className="border-t border-border/20 pt-4 mt-auto">
         <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">Export</h3>
         <div className="flex flex-col gap-2">
-          <Button variant="outline" size="sm" className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover" onClick={onExportJSON}><FileJson className="h-3.5 w-3.5" /> Export JSON</Button>
-          <Button variant="outline" size="sm" className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover" onClick={onDownloadMasterPackage}><Package className="h-3.5 w-3.5" /> Download Master Package</Button>
+          <Button variant="outline" size="sm" className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover" onClick={onExportJSON} disabled={readiness.analysis !== "ready"}>
+            <FileJson className="h-3.5 w-3.5" /> Export JSON
+          </Button>
+          <Button variant="outline" size="sm" className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover" onClick={onDownloadMasterPackage} disabled={readiness.edl !== "ready"}>
+            <Package className="h-3.5 w-3.5" /> Download Master Package
+          </Button>
         </div>
       </div>
     </div>
