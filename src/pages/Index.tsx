@@ -1,9 +1,20 @@
-import { useNavigate } from "react-router-dom";
-import { useState, useRef, useCallback } from "react";
-import { CloudUpload, Film, AlertCircle, X, Loader2, Tv, Clapperboard, XCircle, Check, Sparkles } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { CloudUpload, Film, AlertCircle, X, Loader2, Tv, Clapperboard, XCircle, Check, Sparkles, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+
+// Known-good sample video for demo verification
+const SAMPLE_VIDEO = {
+  filename: "BigBuckBunny-sample.mp4",
+  s3_uri: "s3://storybreak-ai-videos/samples/big-buck-bunny-trailer.mp4",
+  duration_sec: 596,
+  content_type_enum: "feature_film" as const,
+  title: "Big Buck Bunny",
+  delivery_target: "broadcast",
+};
 
 const ACCEPTED_TYPES = ["video/mp4", "video/quicktime"];
 const ACCEPTED_EXT = [".mp4", ".mov"];
@@ -83,10 +94,13 @@ function LabelledInput({ label, required, ...props }: { label: string; required?
 
 const Index = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [demoMode, setDemoMode] = useState(() => searchParams.get("demo") === "1");
+  const [demoLoading, setDemoLoading] = useState(false);
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [fileName, setFileName] = useState("");
   const [fileSize, setFileSize] = useState(0);
@@ -287,7 +301,58 @@ const Index = () => {
   const handleDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(false); }, []);
   const handleDrop = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragOver(false); handleFileSelect(e.dataTransfer.files); }, [handleFileSelect]);
 
-  const isBusy = uploadState !== "idle";
+  // Hidden keyboard shortcut: Ctrl+Shift+D toggles demo mode
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === "D") {
+        e.preventDefault();
+        setDemoMode((prev) => {
+          const next = !prev;
+          toast({ title: next ? "Demo mode activated" : "Demo mode deactivated", description: next ? "Sample video trigger is now visible." : "Hidden again." });
+          return next;
+        });
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
+
+  const handleRunDemo = useCallback(async () => {
+    setDemoLoading(true);
+    setError(null);
+    try {
+      console.log("[Demo] Starting sample project pipeline…");
+      const { data, error: fnErr } = await supabase.functions.invoke("upload-video", {
+        body: {
+          filename: SAMPLE_VIDEO.filename,
+          content_type: "video/mp4",
+          file_size: 0,
+          duration_sec: SAMPLE_VIDEO.duration_sec,
+          is_sample: true,
+          s3_uri_override: SAMPLE_VIDEO.s3_uri,
+          content_type_enum: SAMPLE_VIDEO.content_type_enum,
+          content_metadata: { title: SAMPLE_VIDEO.title },
+          delivery_target: SAMPLE_VIDEO.delivery_target,
+        },
+      });
+
+      if (fnErr || !data?.project_id) {
+        throw new Error(data?.error || fnErr?.message || "Failed to create sample project");
+      }
+
+      console.log("[Demo] Sample project created:", data.project_id);
+      toast({ title: "Demo project created", description: `Project ${data.project_id.slice(0, 8)}… — navigating to processing.` });
+      navigate(`/processing/${data.project_id}`);
+    } catch (err: any) {
+      console.error("[Demo] Failed:", err);
+      setError(`Demo failed: ${err.message}`);
+      toast({ title: "Demo failed", description: err.message, variant: "destructive" });
+    } finally {
+      setDemoLoading(false);
+    }
+  }, [navigate]);
+
+  const isBusy = uploadState !== "idle" || demoLoading;
 
   const panelStyle = "rounded-xl border border-border/15";
   const panelBg = "hsl(222 25% 11%)";
@@ -295,9 +360,25 @@ const Index = () => {
   return (
     <div className="p-8 max-w-[1200px] mx-auto">
       {/* Page Header */}
-      <div className="mb-8">
-        <h2 className="text-xl font-bold text-foreground tracking-tight">New Intelligence Analysis</h2>
-        <p className="text-sm text-muted-foreground mt-1">Configure your video parameters for deep act-structure detection.</p>
+      <div className="mb-8 flex items-end justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-foreground tracking-tight">New Intelligence Analysis</h2>
+          <p className="text-sm text-muted-foreground mt-1">Configure your video parameters for deep act-structure detection.</p>
+        </div>
+
+        {/* Demo mode trigger — only visible with ?demo=1 or Ctrl+Shift+D */}
+        {demoMode && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2 text-xs h-9 rounded-xl border-amber-500/30 bg-amber-500/5 text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/50 transition-all animate-fade-in"
+            onClick={handleRunDemo}
+            disabled={isBusy}
+          >
+            {demoLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FlaskConical className="h-3.5 w-3.5" />}
+            {demoLoading ? "Creating demo…" : "Run Sample Analysis"}
+          </Button>
+        )}
       </div>
 
       <div className="flex gap-8">
