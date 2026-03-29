@@ -1,8 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useRef, useCallback } from "react";
-import { CloudUpload, Play, Film, AlertCircle, X, Loader2 } from "lucide-react";
+import { CloudUpload, Play, Film, AlertCircle, X, Loader2, Tv, Radio, Clapperboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 
 const ACCEPTED_TYPES = ["video/mp4", "video/quicktime"];
@@ -43,6 +44,7 @@ const Index = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [fileName, setFileName] = useState<string>("");
   const [loadingSample, setLoadingSample] = useState(false);
+  const [deliveryTarget, setDeliveryTarget] = useState<string>("youtube");
 
   const handleTrySample = useCallback(async () => {
     setLoadingSample(true);
@@ -56,6 +58,7 @@ const Index = () => {
           duration_sec: 600,
           is_sample: true,
           s3_uri_override: "s3://storybreak-ai-videos/samples/sample-video.mp4",
+          delivery_target: deliveryTarget,
         },
       });
       if (fnError || !data?.project_id) {
@@ -68,7 +71,7 @@ const Index = () => {
       setError("Failed to load sample video.");
       setLoadingSample(false);
     }
-  }, [navigate]);
+  }, [navigate, deliveryTarget]);
 
   const validateAndUpload = useCallback(async (file: File) => {
     setError(null);
@@ -123,6 +126,7 @@ const Index = () => {
           content_type: file.type || "video/mp4",
           file_size: file.size,
           duration_sec: Math.round(duration),
+          delivery_target: deliveryTarget,
         },
       });
 
@@ -203,9 +207,41 @@ const Index = () => {
           <span className="text-muted-foreground font-normal ml-1.5">AI</span>
         </h1>
       </div>
-      <p className="text-sm text-muted-foreground text-center max-w-md leading-relaxed mb-10">
-        Turn long-form video into structured moments and highlights instantly
+      <p className="text-sm text-muted-foreground text-center max-w-md leading-relaxed mb-6">
+        AI-powered ad-break intelligence for video content
       </p>
+
+      {/* Delivery Target Selector */}
+      <div className="w-full max-w-sm mb-8">
+        <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2 block text-center">
+          Delivery Target
+        </label>
+        <Select value={deliveryTarget} onValueChange={setDeliveryTarget}>
+          <SelectTrigger className="glass-panel-elevated border-border/30 h-12 rounded-xl text-sm font-medium">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="glass-panel-elevated border-border/30 rounded-xl">
+            <SelectItem value="youtube" className="rounded-lg">
+              <span className="flex items-center gap-2">
+                <Tv className="h-4 w-4 text-red-400" />
+                YouTube · 3-5 min intervals
+              </span>
+            </SelectItem>
+            <SelectItem value="cable_vod" className="rounded-lg">
+              <span className="flex items-center gap-2">
+                <Radio className="h-4 w-4 text-blue-400" />
+                Cable / VOD · 8-12 min intervals
+              </span>
+            </SelectItem>
+            <SelectItem value="broadcast" className="rounded-lg">
+              <span className="flex items-center gap-2">
+                <Clapperboard className="h-4 w-4 text-amber-400" />
+                Broadcast / Master · Act structures
+              </span>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       {/* Cinematic Upload Zone */}
       <div

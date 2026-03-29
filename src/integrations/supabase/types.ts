@@ -16,28 +16,40 @@ export type Database = {
     Tables: {
       breakpoints: {
         Row: {
+          ad_slot_duration_rec: number | null
+          compliance_notes: string | null
           confidence: number | null
           id: string
+          lead_in_sec: number | null
           project_id: string
           reason: string | null
           timestamp_sec: number
           type: string | null
+          valley_type: string | null
         }
         Insert: {
+          ad_slot_duration_rec?: number | null
+          compliance_notes?: string | null
           confidence?: number | null
           id?: string
+          lead_in_sec?: number | null
           project_id: string
           reason?: string | null
           timestamp_sec: number
           type?: string | null
+          valley_type?: string | null
         }
         Update: {
+          ad_slot_duration_rec?: number | null
+          compliance_notes?: string | null
           confidence?: number | null
           id?: string
+          lead_in_sec?: number | null
           project_id?: string
           reason?: string | null
           timestamp_sec?: number
           type?: string | null
+          valley_type?: string | null
         }
         Relationships: [
           {
@@ -125,18 +137,21 @@ export type Database = {
       projects: {
         Row: {
           created_at: string
+          delivery_target: string | null
           id: string
           status: Database["public"]["Enums"]["project_status"]
           title: string
         }
         Insert: {
           created_at?: string
+          delivery_target?: string | null
           id?: string
           status?: Database["public"]["Enums"]["project_status"]
           title: string
         }
         Update: {
           created_at?: string
+          delivery_target?: string | null
           id?: string
           status?: Database["public"]["Enums"]["project_status"]
           title?: string
