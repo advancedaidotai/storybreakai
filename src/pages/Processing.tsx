@@ -95,7 +95,7 @@ const Processing = () => {
       const newStatus = data.status as ProjectStatus;
       setStatus(newStatus);
 
-      if (newStatus === "complete" || newStatus === "ready") {
+      if (newStatus === "complete" || newStatus === "ready" || newStatus === "highlights_done") {
         navigate(`/results/${projectId}`, { replace: true });
         return;
       }
