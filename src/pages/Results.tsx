@@ -888,8 +888,8 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
 
 function ConfidenceRow({ value }: { value: number | null }) {
   if (value === null) return null;
-  const pct = value > 1 ? value : value * 100;
-  return (<div className="flex justify-between"><span className="text-muted-foreground">Confidence</span><span className={`font-semibold ${confidenceColor(value > 1 ? value / 100 : value)}`}>{pct.toFixed(1)}%</span></div>);
+  const pct = value * 100;
+  return (<div className="flex justify-between"><span className="text-muted-foreground">Confidence</span><span className={`font-semibold ${confidenceColor(value)}`}>{pct.toFixed(1)}%</span></div>);
 }
 
 function ReasonBox({ title, text }: { title: string; text: string }) {
