@@ -44,6 +44,7 @@ const Index = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [fileName, setFileName] = useState<string>("");
   const [loadingSample, setLoadingSample] = useState(false);
+  const [deliveryTarget, setDeliveryTarget] = useState<string>("youtube");
 
   const handleTrySample = useCallback(async () => {
     setLoadingSample(true);
