@@ -151,6 +151,86 @@ function generateOTTManifest(breakpoints: Breakpoint[], projectId: string, proje
   };
 }
 
+// ─── FCP XML export helper ───────────────────────────────────────────────────
+
+function escapeXml(str: string): string {
+  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+}
+
+function generateFCPXML(breakpoints: Breakpoint[], segments: Segment[], title: string, durationSec: number): string {
+  const fps = 24;
+  const toRational = (sec: number) => `${Math.round(sec * fps)}/${fps}s`;
+  const lines: string[] = [
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<!DOCTYPE fcpxml>`,
+    `<fcpxml version="1.9">`,
+    `  <resources>`,
+    `    <format id="r1" name="FFVideoFormat1080p${fps}" frameDuration="1/${fps}s" width="1920" height="1080"/>`,
+    `  </resources>`,
+    `  <library>`,
+    `    <event name="${escapeXml(title)}">`,
+    `      <project name="${escapeXml(title)} - StoryBreak">`,
+    `        <sequence format="r1" duration="${toRational(durationSec)}" tcStart="0/1s">`,
+    `          <spine>`,
+  ];
+  segments.forEach((seg) => {
+    const dur = seg.end_sec - seg.start_sec;
+    lines.push(
+      `            <gap name="${escapeXml(SEGMENT_LABELS[seg.type] || seg.type)}" offset="${toRational(seg.start_sec)}" duration="${toRational(dur)}">`,
+      ...(seg.summary ? [`              <note>${escapeXml(seg.summary)}</note>`] : []),
+      `            </gap>`,
+    );
+  });
+  lines.push(`          </spine>`);
+  breakpoints.forEach((bp, i) => {
+    lines.push(`          <chapter-marker start="${toRational(bp.timestamp_sec)}" duration="1/${fps}s" value="${escapeXml(`Ad Break ${i + 1} — ${bp.valley_type || "scene_transition"}`)}" />`);
+  });
+  lines.push(`        </sequence>`, `      </project>`, `    </event>`, `  </library>`, `</fcpxml>`);
+  return lines.join("\n");
+}
+
+// ─── Premiere XML (xmeml) export helper ──────────────────────────────────────
+
+function generatePremiereXML(breakpoints: Breakpoint[], segments: Segment[], title: string, durationSec: number): string {
+  const fps = 24;
+  const toFrames = (sec: number) => Math.round(sec * fps);
+  const lines: string[] = [
+    `<?xml version="1.0" encoding="UTF-8"?>`,
+    `<xmeml version="5">`,
+    `  <sequence>`,
+    `    <name>${escapeXml(title)} - StoryBreak</name>`,
+    `    <duration>${toFrames(durationSec)}</duration>`,
+    `    <rate><timebase>${fps}</timebase><ntsc>FALSE</ntsc></rate>`,
+    `    <timecode><string>00:00:00:00</string><frame>0</frame><rate><timebase>${fps}</timebase><ntsc>FALSE</ntsc></rate></timecode>`,
+  ];
+  breakpoints.forEach((bp, i) => {
+    lines.push(
+      `    <marker>`,
+      `      <name>Ad Break ${i + 1}</name>`,
+      `      <comment>${escapeXml(bp.reason || "Natural narrative pause")} | ${bp.valley_type || "scene_transition"} | Confidence: ${bp.confidence !== null ? Math.round((bp.confidence > 1 ? bp.confidence : bp.confidence * 100)) : "N/A"}%</comment>`,
+      `      <in>${toFrames(bp.timestamp_sec)}</in>`,
+      `      <out>${toFrames(bp.timestamp_sec) + toFrames(bp.ad_slot_duration_rec ?? 30)}</out>`,
+      `    </marker>`,
+    );
+  });
+  lines.push(`    <media>`, `      <video>`, `        <track>`);
+  segments.forEach((seg) => {
+    const dur = seg.end_sec - seg.start_sec;
+    lines.push(
+      `          <clipitem>`,
+      `            <name>${escapeXml(SEGMENT_LABELS[seg.type] || seg.type)}${seg.summary ? " — " + escapeXml(seg.summary.slice(0, 60)) : ""}</name>`,
+      `            <duration>${toFrames(dur)}</duration>`,
+      `            <start>${toFrames(seg.start_sec)}</start>`,
+      `            <end>${toFrames(seg.end_sec)}</end>`,
+      `            <in>0</in>`,
+      `            <out>${toFrames(dur)}</out>`,
+      `          </clipitem>`,
+    );
+  });
+  lines.push(`        </track>`, `      </video>`, `    </media>`, `  </sequence>`, `</xmeml>`);
+  return lines.join("\n");
+}
+
 // ─── Skeleton Components ─────────────────────────────────────────────────────
 
 function VideoSkeleton({ label }: { label: string }) {
