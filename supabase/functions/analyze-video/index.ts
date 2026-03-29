@@ -103,9 +103,9 @@ function normalizeKnownAnalysisError(message: string): string {
 
 function isKnownAnalysisInputError(message: string): boolean {
   const msg = message.toLowerCase();
-  if (msg.includes("s3location not found") || msg.includes("video file not found in storage")) return true;
-  const msg = message.toLowerCase();
   return (
+    msg.includes("s3location not found") ||
+    msg.includes("video file not found in storage") ||
     msg.includes("unprocessable video") ||
     msg.includes("video format not supported") ||
     msg.includes("codec") ||
