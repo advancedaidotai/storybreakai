@@ -1162,23 +1162,39 @@ const Results = () => {
 
   
 
+  const downloadFile = useCallback((content: string, filename: string, mime = "text/plain") => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
   const handleDownloadMasterPackage = useCallback(() => {
     const safeTitle = (projectInfo.title || "StoryBreak-Export").replace(/[^a-zA-Z0-9_-]/g, "_");
-    const edl = generateEDL(breakpoints, projectInfo.title || "StoryBreak Export");
-    const ott = generateOTTManifest(breakpoints, projectId || "", projectInfo);
+    const title = projectInfo.title || "StoryBreak Export";
+    const dur = projectInfo.duration_sec || 0;
 
-    const edlBlob = new Blob([edl], { type: "text/plain" });
-    const ottBlob = new Blob([JSON.stringify(ott, null, 2)], { type: "application/json" });
-
-    const edlUrl = URL.createObjectURL(edlBlob);
-    const edlA = document.createElement("a"); edlA.href = edlUrl; edlA.download = `${safeTitle}-breakpoints.edl`; edlA.click(); URL.revokeObjectURL(edlUrl);
-
+    downloadFile(generateEDL(breakpoints, title), `${safeTitle}-breakpoints.edl`);
+    setTimeout(() => downloadFile(generateFCPXML(breakpoints, segments, title, dur), `${safeTitle}-breakpoints.fcpxml`, "application/xml"), 300);
+    setTimeout(() => downloadFile(generatePremiereXML(breakpoints, segments, title, dur), `${safeTitle}-breakpoints-premiere.xml`, "application/xml"), 600);
     setTimeout(() => {
-      const ottUrl = URL.createObjectURL(ottBlob);
-      const ottA = document.createElement("a"); ottA.href = ottUrl; ottA.download = `${safeTitle}-ott-manifest.json`; ottA.click(); URL.revokeObjectURL(ottUrl);
-      toast({ title: "Master Package exported", description: "EDL + OTT Manifest downloaded successfully." });
-    }, 300);
-  }, [breakpoints, projectInfo, projectId]);
+      downloadFile(JSON.stringify(generateOTTManifest(breakpoints, projectId || "", projectInfo), null, 2), `${safeTitle}-ott-manifest.json`, "application/json");
+      toast({ title: "NLE Package exported", description: "EDL, FCP XML, Premiere XML, and OTT Manifest downloaded." });
+    }, 900);
+  }, [breakpoints, segments, projectInfo, projectId, downloadFile]);
+
+  const handleDownloadFormat = useCallback((fmt: "edl" | "fcpxml" | "premiere" | "ott") => {
+    const safeTitle = (projectInfo.title || "StoryBreak-Export").replace(/[^a-zA-Z0-9_-]/g, "_");
+    const title = projectInfo.title || "StoryBreak Export";
+    const dur = projectInfo.duration_sec || 0;
+    switch (fmt) {
+      case "edl": downloadFile(generateEDL(breakpoints, title), `${safeTitle}-breakpoints.edl`); break;
+      case "fcpxml": downloadFile(generateFCPXML(breakpoints, segments, title, dur), `${safeTitle}-breakpoints.fcpxml`, "application/xml"); break;
+      case "premiere": downloadFile(generatePremiereXML(breakpoints, segments, title, dur), `${safeTitle}-breakpoints-premiere.xml`, "application/xml"); break;
+      case "ott": downloadFile(JSON.stringify(generateOTTManifest(breakpoints, projectId || "", projectInfo), null, 2), `${safeTitle}-ott-manifest.json`, "application/json"); break;
+    }
+    toast({ title: `${fmt.toUpperCase()} exported`, description: `${fmt.toUpperCase()} file downloaded.` });
+  }, [breakpoints, segments, projectInfo, projectId, downloadFile]);
 
   // Compute readiness states from loaded data
   const readiness = useMemo<ReadinessInfo>(() => {
