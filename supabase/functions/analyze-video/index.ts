@@ -109,9 +109,20 @@ function validateAndClean(raw: unknown, projectId: string): { result: AnalysisRe
   const logs: AnalysisLog[] = [];
   if (!raw || typeof raw !== "object") throw new Error("Response is not an object");
   const obj = raw as Record<string, unknown>;
-  if (!Array.isArray(obj.segments)) throw new Error("Missing segments array");
-  if (!Array.isArray(obj.breakpoints)) throw new Error("Missing breakpoints array");
-  if (!Array.isArray(obj.highlights)) throw new Error("Missing highlights array");
+
+  // Default to empty arrays if missing or malformed (handles truncated JSON)
+  if (!Array.isArray(obj.segments)) {
+    logs.push({ project_id: projectId, log_type: "parse_error", message: `Missing or malformed segments array, defaulting to empty`, raw_data: { got: typeof obj.segments } });
+    obj.segments = [];
+  }
+  if (!Array.isArray(obj.breakpoints)) {
+    logs.push({ project_id: projectId, log_type: "parse_error", message: `Missing or malformed breakpoints array, defaulting to empty`, raw_data: { got: typeof obj.breakpoints } });
+    obj.breakpoints = [];
+  }
+  if (!Array.isArray(obj.highlights)) {
+    logs.push({ project_id: projectId, log_type: "parse_error", message: `Missing or malformed highlights array, defaulting to empty`, raw_data: { got: typeof obj.highlights } });
+    obj.highlights = [];
+  }
 
   // ── Segments: filter invalid, clamp confidence ──
   const segments: RawSegment[] = [];
