@@ -763,7 +763,9 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, onDownlo
         <div className="space-y-2">
           {([
             { key: "analysis" as const, label: "AI Analysis" },
-            { key: "edl" as const, label: "EDL Export" },
+            { key: "edl" as const, label: "CMX 3600 EDL" },
+            { key: "fcpxml" as const, label: "FCP XML" },
+            { key: "premiereXml" as const, label: "Premiere XML" },
             { key: "ottJson" as const, label: "OTT JSON" },
           ] as const).map(({ key, label }) => (
             <div key={key} className="flex items-center gap-2">
