@@ -804,7 +804,7 @@ const Index = () => {
                           <p className="text-xs text-muted-foreground">{formatSize(selectedFile.size)}</p>
                         </div>
                         <button
-                          onClick={(e) => { e.stopPropagation(); setSelectedFile(null); setFileName(""); setFileSize(0); }}
+                          onClick={(e) => { e.stopPropagation(); setSelectedFile(null); setFileName(""); setFileSize(0); setCodecWarning(null); }}
                           className="shrink-0 h-8 w-8 rounded-lg bg-surface-2/60 flex items-center justify-center hover:bg-destructive/20 hover:text-destructive transition-colors"
                         >
                           <X className="h-3.5 w-3.5" />
