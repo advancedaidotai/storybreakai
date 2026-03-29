@@ -432,6 +432,7 @@ const Index = () => {
     setFileSize(file.size);
     setError(null);
     setCodecWarning(null);
+    setCodecBlocked(false);
     checkCodecSupport(file);
   }, [checkCodecSupport]);
 
