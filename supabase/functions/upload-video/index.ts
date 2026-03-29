@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
     }
 
     const command = new PutObjectCommand({
-      Bucket: s3Bucket,
+      Bucket: effectiveBucket,
       Key: s3Key,
       ContentType: content_type,
     });

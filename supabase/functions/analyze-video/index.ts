@@ -472,7 +472,7 @@ async function ensureS3Uri(
   const contentType = dlResp.headers.get("content-type") || "video/mp4";
 
   const s3Client = new S3Client({
-    region: bedrockRegion,
+    region: s3Region,
     credentials: {
       accessKeyId: awsAccessKey,
       secretAccessKey: awsSecretKey,
