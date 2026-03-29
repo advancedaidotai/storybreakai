@@ -1067,7 +1067,7 @@ const Results = () => {
       <div className="flex flex-col px-4 py-4 max-w-[1400px] mx-auto gap-4 animate-fade-in">
         <div className="h-14 rounded-2xl skeleton-shimmer" />
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_280px] gap-4">
-          <VideoSkeleton label="Source Video" /><VideoSkeleton label="AI Highlight Reel" />
+          <VideoSkeleton label="Source Video" /><VideoSkeleton label="HITL Ad Verifier" />
           <div className="glass-panel rounded-2xl p-4"><div className="h-3 w-24 rounded skeleton-shimmer mb-4" /><div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-3 rounded skeleton-shimmer" style={{ width: `${80 - i * 10}%` }} />)}</div></div>
         </div>
         <div className="h-48 rounded-2xl skeleton-shimmer" />
