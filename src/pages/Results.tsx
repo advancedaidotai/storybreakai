@@ -127,7 +127,7 @@ function generateOTTManifest(breakpoints: Breakpoint[], projectId: string, proje
     generated_at: new Date().toISOString(),
     content_id: projectId,
     content_title: projectInfo.title || "Untitled",
-    delivery_target: projectInfo.delivery_target || "broadcast",
+    delivery_target: projectInfo.delivery_target || "ott",
     total_duration_sec: projectInfo.duration_sec || 0,
     ad_breaks: breakpoints.map((bp, i) => ({
       ad_slot_id: `${projectId}_slot_${i + 1}`,
@@ -453,7 +453,7 @@ function Timeline({
             return (
               <TimelineTooltip key={seg.id} content={
                 <div className="text-[10px]">
-                  <p className="font-semibold text-foreground capitalize">{seg.type.replace("_", " ")}</p>
+                  <p className="font-semibold text-foreground capitalize">{seg.type === "story_unit" ? "Narrative Beat" : seg.type === "transition" ? "Story Transition" : seg.type === "climax" ? "Dramatic Peak" : seg.type === "resolution" ? "Resolution Arc" : seg.type === "opening" ? "Opening Sequence" : seg.type.replace("_", " ")}</p>
                   <p className="text-muted-foreground font-mono">{formatTime(seg.start_sec)} → {formatTime(seg.end_sec)}</p>
                   {seg.summary && <p className="text-muted-foreground mt-1 line-clamp-2">{seg.summary}</p>}
                 </div>
@@ -494,7 +494,7 @@ function Timeline({
             return (
               <TimelineTooltip key={bp.id} content={
                 <div className="text-[10px]">
-                  <p className="font-semibold" style={{ color: "#F59E0B" }}>Breakpoint</p>
+                  <p className="font-semibold" style={{ color: "#F59E0B" }}>{bp.valley_type ? `Recommended Pause — ${bp.valley_type.replace("_", " ")}` : "Recommended Ad Break"}</p>
                   <p className="text-muted-foreground font-mono">{formatTime(bp.timestamp_sec)}</p>
                   {bp.valley_type && <p className="text-muted-foreground capitalize">{bp.valley_type.replace("_", " ")}</p>}
                   {bp.reason && <p className="text-muted-foreground mt-1 line-clamp-2">{bp.reason}</p>}
@@ -521,6 +521,7 @@ function Timeline({
                   <p className="font-semibold" style={{ color: "#8B5CF6" }}>Highlight #{hl.rank_order ?? "—"}</p>
                   <p className="text-muted-foreground font-mono">{formatTime(hl.start_sec)} → {formatTime(hl.end_sec)}</p>
                   <p className="text-muted-foreground">Score: {hl.score ?? "—"}</p>
+                  {hl.reason && <p className="text-muted-foreground mt-1 line-clamp-2">Selected for: {hl.reason}</p>}
                 </div>
               }>
                 <div className={`absolute top-0 cursor-pointer transition-all duration-200 hover:scale-150 ${isSelected ? "scale-150 drop-shadow-[0_0_6px_#8B5CF6]" : ""}`} style={{ left: `${left}%`, transform: "translateX(-50%)" }} onClick={() => onSelectHighlight(hl)}>
@@ -654,7 +655,7 @@ function BreakpointStoryboard({ breakpoints, selected, currentTime, onCardClick 
                 </div>
                 <div className="min-w-0">
                   <span className="text-xs font-semibold text-foreground block">{valley.label}</span>
-                  <span className="text-[10px] text-muted-foreground">Narrative Valley</span>
+                  <span className="text-[10px] text-muted-foreground">Natural pause for ad placement</span>
                 </div>
               </div>
 
@@ -728,7 +729,7 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, readines
     <div className="glass-panel rounded-2xl p-4 flex flex-col gap-4 h-fit lg:sticky lg:top-16 overflow-auto">
       {/* Element Detail */}
       <div>
-        <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">{selected ? "What We Found" : "Tap to Explore"}</h3>
+        <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">{selected ? "Why We Chose This" : "Tap to Explore"}</h3>
         {!selected ? (
           <p className="text-xs text-muted-foreground/60 leading-relaxed">Click any segment, breakpoint, or highlight on the timeline above to see the details.</p>
         ) : selected.kind === "segment" ? (
@@ -1227,7 +1228,7 @@ const Results = () => {
       {/* Win Strategy Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 fade-in-600">
         <ROICard durationSec={projectInfo.duration_sec} contentType={projectInfo.content_type} deliveryTarget={projectInfo.delivery_target} />
-        <ComplianceCard deliveryTarget={projectInfo.delivery_target} />
+        <ComplianceCard deliveryTarget={projectInfo.delivery_target} breakpoints={breakpoints} totalDuration={totalDuration || projectInfo.duration_sec} />
         <SimilarContent />
       </div>
     </div>

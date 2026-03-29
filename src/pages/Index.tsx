@@ -1,7 +1,7 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useRef, useCallback, useEffect } from "react";
 import RecentProjects from "@/components/RecentProjects";
-import { CloudUpload, Film, AlertCircle, X, Loader2, Tv, Clapperboard, XCircle, Check, Sparkles, FlaskConical, Link2, Zap, Shield } from "lucide-react";
+import { CloudUpload, Film, AlertCircle, X, Loader2, Tv, Clapperboard, XCircle, Check, Sparkles, FlaskConical, Link2, Zap, Shield, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
@@ -21,6 +21,7 @@ const ACCEPTED_TYPES = ["video/mp4", "video/quicktime"];
 const ACCEPTED_EXT = [".mp4", ".mov"];
 
 const CONTENT_CONFIGS = {
+  short_form: { maxDuration: 15 * 60, maxSize: 2 * 1024 ** 3, durationLabel: "15 min", sizeLabel: "2 GB" },
   tv_episode: { maxDuration: 60 * 60, maxSize: 4 * 1024 ** 3, durationLabel: "60 min", sizeLabel: "4 GB" },
   feature_film: { maxDuration: 180 * 60, maxSize: 10 * 1024 ** 3, durationLabel: "180 min", sizeLabel: "10 GB" },
 } as const;
@@ -140,7 +141,7 @@ const Index = () => {
   const [episodeTitle, setEpisodeTitle] = useState("");
   const [tvStudio, setTvStudio] = useState("");
 
-  const [deliveryTarget, setDeliveryTarget] = useState("broadcast");
+  const [deliveryTarget, setDeliveryTarget] = useState("ott");
   const [touched, setTouched] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<UploadProgress>({ totalParts: 0, completedParts: 0, bytesUploaded: 0, totalBytes: 0, startTime: 0 });
@@ -159,13 +160,16 @@ const Index = () => {
   const speed = elapsed > 0 ? progress.bytesUploaded / elapsed : 0;
   const remaining = speed > 0 ? (progress.totalBytes - progress.bytesUploaded) / speed : 0;
 
-  const titleValid = contentType === "feature_film" ? filmTitle.trim().length > 0 : showTitle.trim().length > 0;
+  const titleValid = contentType === "feature_film" || contentType === "short_form" ? filmTitle.trim().length > 0 : showTitle.trim().length > 0;
   const hasVideoSource = videoSourceMode === "upload" ? selectedFile !== null : urlValid;
   const formValid = titleValid && hasVideoSource;
 
   const buildMetadata = () => {
     const meta: Record<string, any> = {};
     if (contentType === "feature_film") {
+      meta.title = filmTitle;
+      if (studio) meta.network = studio;
+    } else if (contentType === "short_form") {
       meta.title = filmTitle;
       if (studio) meta.network = studio;
     } else {
@@ -485,10 +489,11 @@ const Index = () => {
               <StepBadge n={1} />
               <h3 className="text-sm font-semibold text-foreground">What are you working on?</h3>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               {([
-                { type: "feature_film" as ContentType, icon: Clapperboard, label: "Feature Film", sub: "Perfect for movies & documentaries" },
-                { type: "tv_episode" as ContentType, icon: Tv, label: "TV Episode", sub: "Great for series & episodic content" },
+                { type: "short_form" as ContentType, icon: Video, label: "Short Form", sub: "Videos under 15 minutes — vlogs, tutorials, clips" },
+                { type: "tv_episode" as ContentType, icon: Tv, label: "TV Episode", sub: "Series & episodic content with act structure" },
+                { type: "feature_film" as ContentType, icon: Clapperboard, label: "Feature Film", sub: "Movies, documentaries & long-form content" },
               ]).map(({ type, icon: Icon, label, sub }) => {
                 const selected = contentType === type;
                 return (
@@ -529,11 +534,11 @@ const Index = () => {
               <h3 className="text-sm font-semibold text-foreground">Tell us about your content</h3>
             </div>
 
-            {contentType === "feature_film" ? (
+            {contentType === "feature_film" || contentType === "short_form" ? (
               <div className="space-y-4 animate-[fade-in_300ms_ease-out]" key="film">
-                <LabelledInput label="Film Title" required value={filmTitle} onChange={(e) => setFilmTitle(e.target.value)} placeholder="What's your film called?" />
+                <LabelledInput label={contentType === "short_form" ? "Video Title" : "Film Title"} required value={filmTitle} onChange={(e) => setFilmTitle(e.target.value)} placeholder={contentType === "short_form" ? "What's your video called?" : "What's your film called?"} />
                 {touched && !filmTitle.trim() && <p className="text-[11px] text-destructive -mt-2">We need a title to get started</p>}
-                <LabelledInput label="Studio / Network" value={studio} onChange={(e) => setStudio(e.target.value)} placeholder="Which studio or network?" />
+                <LabelledInput label="Studio / Creator" value={studio} onChange={(e) => setStudio(e.target.value)} placeholder={contentType === "short_form" ? "Channel or creator name" : "Which studio or network?"} />
               </div>
             ) : (
               <div className="space-y-4 animate-[fade-in_300ms_ease-out]" key="tv">
@@ -570,10 +575,12 @@ const Index = () => {
                 className="w-full bg-[hsl(220_25%_8%)] border border-border/20 rounded-lg px-3 h-10 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer"
                 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
               >
-                <option value="broadcast">📺 Broadcast — Act breaks at 22/44 min</option>
-                <option value="cable">📡 Cable — 8–12 min intervals</option>
-                <option value="ott">🎬 Streaming / OTT — Flexible mid-rolls ⭐</option>
-                <option value="youtube">▶️ YouTube — 3–5 min intervals</option>
+                <option value="youtube">▶️ YouTube — Mid-rolls every 3-5 min (8+ min videos)</option>
+                <option value="social">📱 Social — TikTok, Reels, Shorts optimized</option>
+                <option value="ott">🎬 OTT / Streaming — Flexible mid-rolls every 5-10 min</option>
+                <option value="cable">📡 Cable — Commercial pods every 8-12 min</option>
+                <option value="cable_vod">📀 Cable VOD — DAI markers every 10-12 min</option>
+                <option value="broadcast">📺 Broadcast — Strict act breaks at 22/44 min</option>
               </select>
             </div>
           </div>

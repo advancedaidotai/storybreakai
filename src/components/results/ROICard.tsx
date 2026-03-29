@@ -6,6 +6,8 @@ const COMPLIANCE_RULES: Record<string, string> = {
   cable: "Cable · 8-12 min commercial pods",
   broadcast: "Broadcast · Act breaks at 22/44 min",
   ott: "OTT · Flexible mid-roll placements",
+  social: "Social · Hook-optimized clips",
+  streaming: "Streaming · Chapter markers",
 };
 
 interface ROICardProps {
@@ -22,7 +24,7 @@ export function ROICard({ durationSec, contentType, deliveryTarget }: ROICardPro
   const aiHours = estimatedMinutes / 60;
   const timeSaved = manualHours - aiHours;
   const costSaved = Math.round(timeSaved * HOURLY_RATE);
-  const activeRule = COMPLIANCE_RULES[deliveryTarget || "broadcast"] || COMPLIANCE_RULES.broadcast;
+  const activeRule = COMPLIANCE_RULES[deliveryTarget || "ott"] || COMPLIANCE_RULES.ott;
 
   const METRICS = [
     { icon: Clock, label: "Time Saved", value: `~${timeSaved.toFixed(1)} hrs`, sub: "vs manual scene logging", color: "text-primary" },
