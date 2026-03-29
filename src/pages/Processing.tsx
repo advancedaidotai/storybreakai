@@ -104,8 +104,26 @@ const Processing = () => {
   useEffect(() => {
     if (!projectId || status !== "uploaded" || triggeredAnalyze.current) return;
     triggeredAnalyze.current = true;
+    console.log("[Processing] Triggering analyze-video for", projectId);
     supabase.functions.invoke("analyze-video", { body: { project_id: projectId } })
-      .then(({ error: fnErr }) => { if (fnErr) console.error("[Processing] analyze-video error:", fnErr.message); });
+      .then(({ data, error: fnErr }) => {
+        if (fnErr) {
+          console.error("[Processing] analyze-video invoke error:", fnErr.message);
+          setError(`Analysis failed to start: ${fnErr.message}`);
+          setStatus("failed");
+        } else if (data?.error) {
+          console.error("[Processing] analyze-video returned error:", data.error);
+          setError(`Analysis error: ${data.error}`);
+          setStatus("failed");
+        } else {
+          console.log("[Processing] analyze-video invoked successfully");
+        }
+      })
+      .catch((err: any) => {
+        console.error("[Processing] analyze-video unexpected error:", err);
+        setError("Failed to connect to analysis service. Please retry.");
+        setStatus("failed");
+      });
   }, [projectId, status]);
 
   // Auto-trigger generate-reel
@@ -113,8 +131,26 @@ const Processing = () => {
     if (!projectId || triggeredReel.current) return;
     if (status === "ready" || status === "highlights_done") {
       triggeredReel.current = true;
+      console.log("[Processing] Triggering generate-reel for", projectId);
       supabase.functions.invoke("generate-reel", { body: { project_id: projectId } })
-        .then(({ error: fnErr }) => { if (fnErr) console.error("[Processing] generate-reel error:", fnErr.message); });
+        .then(({ data, error: fnErr }) => {
+          if (fnErr) {
+            console.error("[Processing] generate-reel invoke error:", fnErr.message);
+            setError(`Reel generation failed: ${fnErr.message}`);
+            setStatus("failed");
+          } else if (data?.error) {
+            console.error("[Processing] generate-reel returned error:", data.error);
+            setError(`Reel error: ${data.error}`);
+            setStatus("failed");
+          } else {
+            console.log("[Processing] generate-reel invoked successfully");
+          }
+        })
+        .catch((err: any) => {
+          console.error("[Processing] generate-reel unexpected error:", err);
+          setError("Failed to connect to reel service. Please retry.");
+          setStatus("failed");
+        });
     }
   }, [projectId, status]);
 
