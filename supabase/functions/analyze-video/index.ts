@@ -1,4 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { BedrockRuntimeClient, InvokeModelCommand } from "npm:@aws-sdk/client-bedrock-runtime";
+import { GetCallerIdentityCommand, STSClient } from "npm:@aws-sdk/client-sts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,58 +26,6 @@ async function flushLogs(supabase: any, logs: AnalysisLog[]) {
   if (logs.length === 0) return;
   const { error } = await supabase.from("analysis_logs").insert(logs);
   if (error) console.error(`[analyze-video] Failed to flush ${logs.length} analysis logs:`, error.message);
-}
-
-// ─── AWS Signature V4 helpers ────────────────────────────────────────────────
-
-function hmacSHA256(key: Uint8Array, msg: string): Promise<ArrayBuffer> {
-  return crypto.subtle
-    .importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
-    .then((k) => crypto.subtle.sign("HMAC", k, new TextEncoder().encode(msg)));
-}
-
-async function sha256(data: Uint8Array): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", data);
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function getSignatureKey(secret: string, date: string, region: string, service: string) {
-  let k = new Uint8Array(await hmacSHA256(new TextEncoder().encode("AWS4" + secret), date));
-  k = new Uint8Array(await hmacSHA256(k, region));
-  k = new Uint8Array(await hmacSHA256(k, service));
-  k = new Uint8Array(await hmacSHA256(k, "aws4_request"));
-  return k;
-}
-
-async function signedBedrockRequest(params: {
-  region: string; accessKey: string; secretKey: string; modelId: string; body: object;
-}): Promise<Response> {
-  const { region, accessKey, secretKey, modelId, body } = params;
-  const service = "bedrock";
-  const host = `bedrock-runtime.${region}.amazonaws.com`;
-  const path = `/model/${modelId}/invoke`;
-  const url = `https://${host}${path}`;
-  const payload = JSON.stringify(body);
-  const payloadBytes = new TextEncoder().encode(payload);
-  const payloadHash = await sha256(payloadBytes);
-  const now = new Date();
-  const amzDate = now.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z/, "Z");
-  const dateStamp = amzDate.slice(0, 8);
-  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
-  const canonicalHeaders = `content-type:application/json\nhost:${host}\nx-amz-date:${amzDate}\n`;
-  const signedHeaders = "content-type;host;x-amz-date";
-  const canonicalRequest = ["POST", path, "", canonicalHeaders, signedHeaders, payloadHash].join("\n");
-  const canonicalRequestHash = await sha256(new TextEncoder().encode(canonicalRequest));
-  const stringToSign = ["AWS4-HMAC-SHA256", amzDate, credentialScope, canonicalRequestHash].join("\n");
-  const signingKey = await getSignatureKey(secretKey, dateStamp, region, service);
-  const signatureBuf = await hmacSHA256(signingKey, stringToSign);
-  const signature = [...new Uint8Array(signatureBuf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-  const authorization = `AWS4-HMAC-SHA256 Credential=${accessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
-  return fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Amz-Date": amzDate, Authorization: authorization, Accept: "application/json" },
-    body: payload,
-  });
 }
 
 // ─── Constants & types ───────────────────────────────────────────────────────
@@ -318,26 +268,84 @@ All timestamps in seconds. Return ONLY valid JSON with keys: segments, breakpoin
 
 // ─── Bedrock call with response parsing ──────────────────────────────────────
 
-async function callPegasus(prompt: string, projectId: string): Promise<{ result: AnalysisResult; logs: AnalysisLog[] }> {
+let cachedAwsAccountId: string | null = null;
+
+async function getAwsAccountId(accessKeyId: string, secretAccessKey: string, region: string): Promise<string> {
+  if (cachedAwsAccountId) return cachedAwsAccountId;
+
+  const stsClient = new STSClient({
+    region,
+    credentials: {
+      accessKeyId,
+      secretAccessKey,
+    },
+  });
+
+  const identity = await stsClient.send(new GetCallerIdentityCommand({}));
+  if (!identity.Account) {
+    throw new Error("Unable to resolve AWS account ID for Bedrock mediaSource.s3Location.bucketOwner");
+  }
+
+  cachedAwsAccountId = identity.Account;
+  return cachedAwsAccountId;
+}
+
+async function callPegasus(
+  prompt: string,
+  projectId: string,
+  s3Uri: string,
+): Promise<{ result: AnalysisResult; logs: AnalysisLog[] }> {
   const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY")!;
   const awsSecretKey = Deno.env.get("AWS_SECRET_KEY")!;
   const bedrockRegion = Deno.env.get("BEDROCK_REGION") || "us-east-1";
 
-  const bedrockResp = await signedBedrockRequest({
-    region: bedrockRegion, accessKey: awsAccessKey, secretKey: awsSecretKey,
-    modelId: "twelvelabs.pegasus-1-2-v1:0",
-    body: { inputText: prompt, textGenerationConfig: { maxTokenCount: 8192, temperature: 0.2, topP: 0.9 } },
-  });
-
-  if (!bedrockResp.ok) {
-    const errText = await bedrockResp.text();
-    throw new Error(`Bedrock API error (${bedrockResp.status}): ${errText.slice(0, 500)}`);
+  if (!s3Uri.startsWith("s3://")) {
+    throw new Error(`Pegasus requires an s3:// video URI, received: ${s3Uri.slice(0, 120)}`);
   }
 
-  const bedrockData = await bedrockResp.json();
+  const awsAccountId = await getAwsAccountId(awsAccessKey, awsSecretKey, bedrockRegion);
+
+  const bedrockClient = new BedrockRuntimeClient({
+    region: bedrockRegion,
+    credentials: {
+      accessKeyId: awsAccessKey,
+      secretAccessKey: awsSecretKey,
+    },
+  });
+
+  let bedrockData: any;
+  try {
+    const command = new InvokeModelCommand({
+      modelId: "twelvelabs.pegasus-1-2-v1:0",
+      contentType: "application/json",
+      accept: "application/json",
+      body: new TextEncoder().encode(
+        JSON.stringify({
+          inputPrompt: prompt,
+          mediaSource: {
+            s3Location: {
+              uri: s3Uri,
+              bucketOwner: awsAccountId,
+            },
+          },
+          maxOutputTokens: 4096,
+          temperature: 0.2,
+          topP: 0.9,
+        }),
+      ),
+    });
+
+    const response = await bedrockClient.send(command);
+    const responseBody = new TextDecoder().decode(response.body);
+    bedrockData = JSON.parse(responseBody);
+  } catch (err: any) {
+    throw new Error(`Bedrock SDK invoke failed: ${err?.message || "Unknown Bedrock error"}`);
+  }
+
   let responseText: string;
   if (bedrockData?.results?.[0]?.outputText) responseText = bedrockData.results[0].outputText;
   else if (bedrockData?.output?.text) responseText = bedrockData.output.text;
+  else if (typeof bedrockData?.outputText === "string") responseText = bedrockData.outputText;
   else if (typeof bedrockData?.body === "string") responseText = bedrockData.body;
   else responseText = JSON.stringify(bedrockData);
 
@@ -422,7 +430,7 @@ Deno.serve(async (req) => {
       // ── SINGLE-PASS ──────────────────────────────────────────────
       console.log(`[analyze-video] SINGLE-PASS for project ${projectId} (${durationSec}s, ${contentType})`);
       const prompt = buildPrompt({ s3Uri: video.s3_uri, deliveryLabel, deliveryTarget, contentType });
-      const { result: analysis, logs } = await callPegasus(prompt, projectId);
+      const { result: analysis, logs } = await callPegasus(prompt, projectId, video.s3_uri);
       await flushLogs(supabase, logs);
 
       if (analysis.segments.length === 0) {
@@ -527,7 +535,7 @@ Deno.serve(async (req) => {
           },
         });
 
-        const { result: analysis, logs: chunkLogs } = await callPegasus(prompt, projectId);
+        const { result: analysis, logs: chunkLogs } = await callPegasus(prompt, projectId, video.s3_uri);
         await flushLogs(supabase, chunkLogs);
 
         await supabase.from("analysis_chunks").update({
