@@ -150,7 +150,7 @@ const Processing = () => {
   useEffect(() => {
     if (!projectId || status !== "uploaded" || triggeredAnalyze.current) return;
     triggeredAnalyze.current = true;
-    console.log("[Processing] Triggering analyze-video for", projectId);
+    
     supabase.functions.invoke("analyze-video", { body: { project_id: projectId } })
       .then(({ data, error: fnErr }) => {
         if (fnErr) {
