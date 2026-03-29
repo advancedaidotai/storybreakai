@@ -102,17 +102,41 @@ function generateEDL(breakpoints: Breakpoint[], title: string): string {
   const lines = ["TITLE: " + title, "FCM: NON-DROP FRAME", ""];
   breakpoints.forEach((bp, i) => {
     const eventNum = String(i + 1).padStart(3, "0");
-    const tc = formatTimecode(bp.timestamp_sec);
-    const leadIn = bp.lead_in_sec ? formatTimecode(bp.lead_in_sec) : formatTimecode(Math.max(0, bp.timestamp_sec - 2));
-    lines.push(`${eventNum}  001      V     C        ${leadIn} ${tc} ${leadIn} ${tc}`, `* VALLEY_TYPE: ${bp.valley_type || "unknown"}`, `* REASON: ${bp.reason || "N/A"}`, `* AD_SLOT_DURATION: ${bp.ad_slot_duration_rec ?? "N/A"}s`, `* COMPLIANCE: ${bp.compliance_notes || "N/A"}`, "");
+    const tcIn = formatTimecode(Math.max(0, bp.timestamp_sec - (bp.lead_in_sec ?? 2)));
+    const tcOut = formatTimecode(bp.timestamp_sec);
+    lines.push(
+      `${eventNum}  AX       V     C        ${tcIn} ${tcOut} ${tcIn} ${tcOut}`,
+      `* VALLEY_TYPE: ${bp.valley_type || "scene_transition"}`,
+      `* REASON: ${bp.reason || "Natural narrative pause detected"}`,
+      `* CONFIDENCE: ${bp.confidence !== null ? (bp.confidence > 1 ? bp.confidence : (bp.confidence * 100).toFixed(0)) : "N/A"}%`,
+      `* AD_SLOT_DURATION: ${bp.ad_slot_duration_rec ?? 30}s`,
+      `* COMPLIANCE: ${bp.compliance_notes || "No specific compliance flags"}`,
+      "",
+    );
   });
   return lines.join("\n");
 }
 
-function generateOTTManifest(breakpoints: Breakpoint[], projectId: string) {
+function generateOTTManifest(breakpoints: Breakpoint[], projectId: string, projectInfo: ProjectInfo) {
   return {
-    version: "1.0", project_id: projectId, format: "VMAP", generated_at: new Date().toISOString(),
-    ad_breaks: breakpoints.map((bp, i) => ({ ad_slot_id: `${projectId}_slot_${i + 1}`, position_sec: bp.timestamp_sec, time_offset: formatTimecode(bp.timestamp_sec), duration_rec: bp.ad_slot_duration_rec ?? 30, context_type: bp.valley_type || "natural_pause", break_type: "linear", confidence: bp.confidence, compliance_notes: bp.compliance_notes || null, reason: bp.reason || null })),
+    version: "1.0",
+    format: "VMAP",
+    generated_at: new Date().toISOString(),
+    content_id: projectId,
+    content_title: projectInfo.title || "Untitled",
+    delivery_target: projectInfo.delivery_target || "broadcast",
+    total_duration_sec: projectInfo.duration_sec || 0,
+    ad_breaks: breakpoints.map((bp, i) => ({
+      ad_slot_id: `${projectId}_slot_${i + 1}`,
+      position_sec: bp.timestamp_sec,
+      time_offset: formatTimeOffset(bp.timestamp_sec),
+      break_type: "linear" as const,
+      valley_type: bp.valley_type || "scene_transition",
+      confidence: bp.confidence,
+      reason: bp.reason || "Natural narrative pause detected",
+      compliance_notes: bp.compliance_notes || "No specific compliance flags",
+      ad_slot_duration_rec: bp.ad_slot_duration_rec ?? 30,
+    })),
   };
 }
 
