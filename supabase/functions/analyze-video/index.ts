@@ -38,11 +38,29 @@ const DELIVERY_LABELS: Record<string, string> = {
   cable: "Cable (8-12 minute ad-break intervals)",
   broadcast: "Broadcast/Master (act structure breaks)",
   ott: "OTT/Streaming (flexible mid-roll ad placements)",
+  streaming: "Streaming (chapter markers & minimal mid-rolls)",
+  social: "Social Media (hooks, clips & engagement peaks)",
 };
 
-const CONTENT_TYPE_PROMPTS: Record<string, string> = {
-  tv_episode: "This is a TV episode. Identify act breaks, cold opens, and commercial break points. Segments should map to TV act structure (teaser/act-1/act-2/act-3/tag).",
-  feature_film: "This is a feature film. Identify three-act structure (setup/confrontation/resolution), major plot points, inciting incident, midpoint reversal, climax, and denouement. Breakpoints should identify natural intermission points and reel changes.",
+const CONTENT_TYPE_PROMPTS: Record<string, string | ((durationSec: number) => string)> = {
+  short_form: (durationSec: number) => {
+    if (durationSec <= 60) {
+      return "This is ultra-short content (under 1 minute). Identify the hook (first 3 seconds), the core message, and the call-to-action. Do not place mid-roll breaks. Focus on clip boundaries and peak engagement moments.";
+    }
+    if (durationSec <= 300) {
+      return "This is short-form content (under 5 minutes). Identify a tight narrative arc: hook, build, payoff. Place at most 1 mid-roll break at the strongest scene transition. Focus on pacing and engagement peaks. Identify segments suitable for social media repurposing.";
+    }
+    return "This is short-form content. Identify the narrative structure with emphasis on pacing and engagement. Place breaks at natural transition points — topic shifts, scene changes, or tonal shifts. Keep segments concise and identify the most engaging moments for highlights.";
+  },
+
+  tv_episode: "This is a TV episode. Identify act breaks, cold opens, and commercial break points. Segments should map to TV act structure (teaser/cold-open → act-1 → act-2 → act-3 → tag/outro). The cold open should be identified as a distinct segment. Each act break should be a dramatic beat — a cliffhanger, revelation, or emotional peak that motivates viewers to return after the break.",
+
+  feature_film: (durationSec: number) => {
+    if (durationSec < 1800) {
+      return "This is a short film. Identify the narrative arc: setup, rising action, climax, and resolution. Focus on scene transitions and tonal shifts as natural break points. The compact format means fewer but more impactful segment boundaries.";
+    }
+    return "This is a feature film. Identify the three-act structure: Act I (setup, inciting incident — first 25%), Act II (confrontation, rising action, midpoint reversal — middle 50%), Act III (climax, resolution, denouement — final 25%). Mark major plot points, turning points, and emotional peaks. Breakpoints should identify natural intermission points and reel changes that respect the dramatic flow.";
+  },
 };
 
 const SEGMENT_TYPES = ["opening", "climax", "story_unit", "transition", "resolution"];
@@ -214,21 +232,107 @@ function extractJSON(text: string): unknown {
 
 // ─── Build prompt ────────────────────────────────────────────────────────────
 
-const DELIVERY_PROMPT_RULES: Record<string, string> = {
-  youtube: "This is for YouTube delivery. Place ad breaks every 3-5 minutes. Favor frequent, short breaks at conversational pauses or topic transitions. Viewers expect mid-roll ads; place them where engagement dips naturally.",
-  cable_vod: "This is for Cable/VOD delivery. Place ad breaks every 8-12 minutes following standard cable commercial pod timing. Align breaks with scene transitions and act-outs. Each break should feel like a natural 'commercial bumper' moment.",
-  cable: "This is for Cable delivery. Place ad breaks every 8-12 minutes following standard cable commercial pod timing. Align breaks with scene transitions and act-outs. Each break should feel like a natural 'commercial bumper' moment.",
-  broadcast: "This is for Broadcast/Master delivery. Follow strict broadcast act structure with breaks only at act boundaries. Breaks must align with fade-to-black or established act-out patterns. Compliance with broadcast standards is critical.",
-  ott: "This is for OTT/Streaming delivery. Place mid-roll ad breaks at natural narrative valleys with flexible timing (typically every 5-10 minutes). Optimize for viewer retention — breaks should feel organic, not forced. Favor moments where the viewer would naturally pause. Shorter, more frequent breaks are preferred over long commercial pods.",
+const DELIVERY_PROMPT_RULES: Record<string, string | ((durationSec: number) => string)> = {
+  youtube: (durationSec: number) => {
+    if (durationSec < 480) {
+      return "This is for YouTube delivery. The video is under 8 minutes, so mid-roll ads are not eligible. Focus on identifying a strong pre-roll moment and optimal chapter markers for viewer navigation. Identify natural pause points where end-cards or overlays could appear.";
+    }
+    return "This is for YouTube delivery. Place mid-roll ad breaks every 3-5 minutes at natural engagement dips. The first break should come at 3-4 minutes to hook viewers first. Favor conversational pauses, topic transitions, and moments where viewers naturally look away. YouTube viewers expect mid-rolls; place them where they feel earned, not intrusive. Also identify chapter marker candidates for the description.";
+  },
+
+  social: "This is for Social Media delivery (TikTok, Instagram Reels, YouTube Shorts). Focus on identifying the hook (first 3 seconds), peak engagement moments, and natural clip boundaries for repurposing. For content over 60 seconds, identify 1 maximum mid-roll point at a strong scene transition. Prioritize thumb-stop moments and emotional peaks. Identify segments that work as standalone 15-30 second clips.",
+
+  ott: "This is for OTT/Streaming delivery (platforms like Hulu, Peacock, Max, Disney+). Place mid-roll ad breaks at natural narrative valleys every 5-10 minutes. Ad pods should be brief (30-90 seconds recommended). Optimize for viewer retention — breaks should feel organic, never mid-scene or mid-dialogue. Server-Side Ad Insertion (SSAI) compatibility is important: breaks should have clean in/out points. Identify pre-roll and post-roll positions as well.",
+
+  cable: "This is for Cable TV delivery. Place commercial breaks every 8-12 minutes following standard cable pod timing (14-16 minutes of ads per hour total). Align breaks with scene transitions and act-outs. Each break should feel like a natural 'going to commercial' moment. The first break should come earlier (6-8 minutes) to establish the hook. Commercial pods are typically 2-4 minutes each. Ensure break points have clean audio fade-outs.",
+
+  cable_vod: "This is for Cable VOD / On-Demand delivery. Place Dynamic Ad Insertion (DAI) markers every 10-12 minutes. VOD has approximately 50% fewer ad minutes than linear cable. Ad pods should be shorter (30-60 seconds). Also generate chapter markers for viewer scrubbing/navigation. Consider binge-watching transitions — identify natural episode-end-like moments. DAI markers need frame-accurate in/out points.",
+
+  broadcast: (durationSec: number) => {
+    if (durationSec <= 1800) {
+      return "This is for Broadcast TV delivery (30-minute format). Follow strict network act structure: Teaser/Cold Open, then breaks at approximately 7, 14, and 19 minutes. Total commercial time: 8 minutes per half-hour. Breaks MUST align with fade-to-black, act-out dialogue beats, or established act-break patterns. FCC compliance is critical. Each act should have a mini-cliffhanger or dramatic beat before the break.";
+    }
+    if (durationSec <= 3600) {
+      return "This is for Broadcast TV delivery (60-minute format). Follow strict network act structure with 5-6 act breaks at approximately 11, 22, 33, 40, and 48 minutes. Total commercial time: 16 minutes per hour. Breaks MUST align with fade-to-black, act-out dialogue beats, or established act-break patterns. FCC compliance is critical. Each act should end with a dramatic beat, revelation, or cliffhanger to retain viewers through the commercial pod.";
+    }
+    return "This is for Broadcast/Master delivery of long-form content. Place breaks at natural act boundaries and intermission points, approximately every 15-20 minutes. Breaks must align with fade-to-black or established act-out patterns. For theatrical content, identify reel change points. Compliance with broadcast standards is critical.";
+  },
+
+  streaming: "This is for Streaming platform delivery (Netflix, Apple TV+, Amazon Prime style). Focus on chapter markers rather than ad breaks — these platforms may not have ads. Identify natural chapter boundaries every 8-12 minutes for viewer navigation. Mark skip-intro and skip-recap candidates. Identify binge-worthy cliffhanger moments at the end. If ad-supported tier is targeted, place minimal non-intrusive mid-roll markers every 10-15 minutes.",
 };
 
+function getExpectedCounts(durationSec: number, deliveryTarget: string): {
+  bpMin: number; bpMax: number; segMin: number; segMax: number; hlMin: number; hlMax: number;
+} {
+  const breakIntervals: Record<string, number> = {
+    youtube: 240,
+    social: 0,
+    ott: 450,
+    cable: 540,
+    cable_vod: 660,
+    broadcast: 480,
+    streaming: 480,
+  };
+
+  const interval = breakIntervals[deliveryTarget] || 450;
+
+  if (deliveryTarget === "social") {
+    return {
+      bpMin: 0, bpMax: Math.max(1, Math.floor(durationSec / 180)),
+      segMin: 2, segMax: Math.max(3, Math.ceil(durationSec / 60)),
+      hlMin: 2, hlMax: Math.max(3, Math.ceil(durationSec / 30)),
+    };
+  }
+
+  if (deliveryTarget === "youtube" && durationSec < 480) {
+    return {
+      bpMin: 0, bpMax: 1,
+      segMin: 2, segMax: 4,
+      hlMin: 2, hlMax: 5,
+    };
+  }
+
+  if (deliveryTarget === "broadcast") {
+    if (durationSec <= 1800) {
+      return { bpMin: 2, bpMax: 4, segMin: 3, segMax: 5, hlMin: 3, hlMax: 6 };
+    } else if (durationSec <= 3600) {
+      return { bpMin: 4, bpMax: 6, segMin: 4, segMax: 8, hlMin: 5, hlMax: 10 };
+    } else {
+      const estBp = Math.max(2, Math.floor(durationSec / 1200));
+      return { bpMin: estBp, bpMax: estBp + 2, segMin: 5, segMax: 12, hlMin: 5, hlMax: 10 };
+    }
+  }
+
+  const estBp = Math.max(1, Math.round(durationSec / interval));
+  const bpMin = Math.max(1, estBp - 1);
+  const bpMax = estBp + 2;
+
+  const estSeg = Math.max(2, Math.ceil(durationSec / 150));
+  const segMin = Math.max(2, Math.min(estSeg, 5));
+  const segMax = Math.max(segMin + 2, Math.min(estSeg + 4, 15));
+
+  const estHl = Math.max(2, Math.ceil(durationSec / 120));
+  const hlMin = Math.max(2, Math.min(estHl, 5));
+  const hlMax = Math.max(hlMin + 3, Math.min(estHl + 5, 15));
+
+  return { bpMin, bpMax, segMin, segMax, hlMin, hlMax };
+}
+
 function buildPrompt(opts: {
-  s3Uri: string; deliveryLabel: string; deliveryTarget: string; contentType?: string;
+  s3Uri: string; deliveryLabel: string; deliveryTarget: string; contentType?: string; durationSec: number;
   chunkContext?: { index: number; total: number; startMin: number; endMin: number; totalMin: number };
 }): string {
-  const { s3Uri, deliveryLabel, deliveryTarget, contentType, chunkContext } = opts;
-  const contentTypeExtra = contentType && CONTENT_TYPE_PROMPTS[contentType] ? ` ${CONTENT_TYPE_PROMPTS[contentType]}` : "";
-  const deliveryRules = DELIVERY_PROMPT_RULES[deliveryTarget] || DELIVERY_PROMPT_RULES.broadcast;
+  const { s3Uri, deliveryLabel, deliveryTarget, contentType, durationSec, chunkContext } = opts;
+
+  const contentTypeRule = contentType ? CONTENT_TYPE_PROMPTS[contentType] : undefined;
+  const contentTypeExtra = contentTypeRule
+    ? ` ${typeof contentTypeRule === "function" ? contentTypeRule(durationSec) : contentTypeRule}`
+    : "";
+
+  const deliveryRule = DELIVERY_PROMPT_RULES[deliveryTarget] || DELIVERY_PROMPT_RULES.ott;
+  const deliveryRules = typeof deliveryRule === "function" ? deliveryRule(durationSec) : deliveryRule;
+
+  const counts = getExpectedCounts(durationSec, deliveryTarget);
 
   let chunkPrefix = "";
   if (chunkContext) {
@@ -245,7 +349,7 @@ CRITICAL CONSTRAINTS:
 - NEVER cut during high-intensity music, crescendos, or emotional musical peaks. Wait for the music to settle or transition.
 - NEVER place a break within 30 seconds of a previous break ending.
 
-BREAKPOINT DETECTION — Identify 5-7 Semantic Narrative Valleys:
+BREAKPOINT DETECTION — Identify ${counts.bpMin}-${counts.bpMax} Semantic Narrative Valleys:
 A Semantic Narrative Valley is a moment where narrative tension, dialogue density, and musical intensity are all simultaneously low — creating an organic pause where an ad break feels natural rather than intrusive.
 
 For each breakpoint return:
@@ -258,10 +362,10 @@ For each breakpoint return:
 - compliance_notes: any broadcast compliance observations (e.g., "Clean fade to black detected", "Scene ends on wide establishing shot — safe cut point", "No active dialogue or music at this timestamp")
 - type: "natural_pause" or "act_break"
 
-SEGMENTS — Return 4-8 narrative segments:
+SEGMENTS — Return ${counts.segMin}-${counts.segMax} narrative segments:
 Each with start_sec, end_sec, type (opening/story_unit/transition/climax/resolution), summary (1-2 sentence description), confidence (0.0-1.0).
 
-HIGHLIGHTS — Return top 5-10 most engaging moments:
+HIGHLIGHTS — Return top ${counts.hlMin}-${counts.hlMax} most engaging moments:
 Score each by: semantic_importance (plot significance) + emotional_intensity (performance energy) + transition_strength (visual dynamism) + pacing_shift (rhythm change) + usability (standalone clip potential).
 Each with start_sec, end_sec, score (0-100), reason (why this moment stands out), rank_order (1 = best).
 
@@ -566,8 +670,8 @@ Deno.serve(async (req) => {
     }
 
     const { data: project } = await supabase.from("projects").select("delivery_target, content_type, duration_sec").eq("id", projectId).single();
-    const deliveryTarget = project?.delivery_target || "youtube";
-    const deliveryLabel = DELIVERY_LABELS[deliveryTarget] || DELIVERY_LABELS.youtube;
+    const deliveryTarget = project?.delivery_target || "ott";
+    const deliveryLabel = DELIVERY_LABELS[deliveryTarget] || DELIVERY_LABELS.ott;
     const contentType = project?.content_type || "short_form";
     let durationSec = project?.duration_sec || video.duration_sec || 0;
     const durationUnknown = !durationSec || durationSec <= 0;
@@ -592,7 +696,7 @@ Deno.serve(async (req) => {
       // ── SINGLE-PASS ──────────────────────────────────────────────
       console.log(`[analyze-video] SINGLE-PASS for project ${projectId} (${durationSec}s, ${contentType})`);
       console.log(`[analyze-video] Starting Pegasus analysis...`);
-      const prompt = buildPrompt({ s3Uri, deliveryLabel, deliveryTarget, contentType });
+      const prompt = buildPrompt({ s3Uri, deliveryLabel, deliveryTarget, contentType, durationSec });
       const { result: analysis, logs } = await callPegasus(prompt, projectId, s3Uri);
       await flushLogs(supabase, logs);
 
@@ -708,6 +812,7 @@ Deno.serve(async (req) => {
           deliveryLabel,
           deliveryTarget,
           contentType,
+          durationSec,
           chunkContext: {
             index: chunkNum,
             total: totalChunks,
