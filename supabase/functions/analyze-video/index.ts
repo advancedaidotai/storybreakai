@@ -596,7 +596,7 @@ Deno.serve(async (req) => {
 
       try {
         const prompt = buildPrompt({
-          s3Uri: video.s3_uri,
+          s3Uri,
           deliveryLabel,
           deliveryTarget,
           contentType,
@@ -609,7 +609,7 @@ Deno.serve(async (req) => {
           },
         });
 
-        const { result: analysis, logs: chunkLogs } = await callPegasus(prompt, projectId, video.s3_uri);
+        const { result: analysis, logs: chunkLogs } = await callPegasus(prompt, projectId, s3Uri);
         await flushLogs(supabase, chunkLogs);
 
         await supabase.from("analysis_chunks").update({
