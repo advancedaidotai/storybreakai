@@ -5,7 +5,7 @@ import {
   Play, Sparkles, Star, Download, FileJson, Zap, Loader2,
   MessageCircle, ArrowRightLeft, Heart, Film, Package,
   Clock, Shield, Timer, Minus, Plus, ChevronLeft, ChevronRight,
-  List, Diamond, MonitorPlay, Clapperboard,
+  List, Diamond, MonitorPlay, Clapperboard, AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
