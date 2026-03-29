@@ -445,8 +445,15 @@ async function callPegasus(
       return response;
     } catch (err: any) {
       clearTimeout(timeout);
+      const errMsg = err?.message || String(err);
+
+      // Check for non-retryable Bedrock errors (video codec/duration issues)
+      if (errMsg.includes("Unprocessable video") || errMsg.includes("error_code\":400")) {
+        throw new Error(`Video format not supported by AI model. The video may use an unsupported codec (try H.264/MP4) or exceed the maximum duration per analysis pass. Original error: ${errMsg}`);
+      }
+
       if (!isRetry) {
-        console.warn(`[analyze-video] Bedrock call failed (${err?.message}), retrying in 5s...`);
+        console.warn(`[analyze-video] Bedrock call failed (${errMsg}), retrying in 5s...`);
         await new Promise((r) => setTimeout(r, 5000));
         return sendWithTimeout(true);
       }
