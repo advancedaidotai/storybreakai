@@ -373,83 +373,133 @@ Deno.serve(async (req) => {
       await supabase.from("projects").update({ status: "highlights_done" }).eq("id", projectId);
       console.log(`[analyze-video] Project ${projectId} single-pass complete`);
     } else {
-      // ── MULTI-PASS ───────────────────────────────────────────────
-      const chunks = calculateChunks(durationSec);
-      const totalMin = Math.round(durationSec / 60);
-      console.log(`[analyze-video] MULTI-PASS for project ${projectId}: ${chunks.length} chunks, ${durationSec}s total`);
+      // ── MULTI-PASS (one chunk per invocation, self-re-invoke) ──
 
-      // Create chunk records
-      const chunkRecords = chunks.map((c, i) => ({
-        project_id: projectId!,
-        chunk_index: i + 1,
-        start_sec: c.start_sec,
-        end_sec: c.end_sec,
-        overlap_start_sec: c.overlap_start_sec,
-        overlap_end_sec: c.overlap_end_sec,
-        status: "pending" as const,
-      }));
-      const { error: chunkInsertErr } = await supabase.from("analysis_chunks").insert(chunkRecords);
-      if (chunkInsertErr) throw new Error(`Failed to create chunk records: ${chunkInsertErr.message}`);
+      // Check if chunk records already exist (resuming)
+      const { data: existingChunks } = await supabase
+        .from("analysis_chunks")
+        .select("chunk_index, status")
+        .eq("project_id", projectId)
+        .order("chunk_index");
 
-      // Process chunks sequentially
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        const chunkNum = i + 1;
-        console.log(`[analyze-video] Processing chunk ${chunkNum}/${chunks.length} (${chunk.start_sec}s - ${chunk.end_sec}s)`);
+      if (!existingChunks || existingChunks.length === 0) {
+        // First invocation: create chunk records
+        const chunks = calculateChunks(durationSec);
+        console.log(`[analyze-video] MULTI-PASS INIT for project ${projectId}: ${chunks.length} chunks, ${durationSec}s total`);
 
-        await supabase.from("analysis_chunks").update({ status: "analyzing" }).eq("project_id", projectId).eq("chunk_index", chunkNum);
+        const chunkRecords = chunks.map((c, i) => ({
+          project_id: projectId!,
+          chunk_index: i + 1,
+          start_sec: c.start_sec,
+          end_sec: c.end_sec,
+          overlap_start_sec: c.overlap_start_sec,
+          overlap_end_sec: c.overlap_end_sec,
+          status: "pending" as const,
+        }));
+        const { error: chunkInsertErr } = await supabase.from("analysis_chunks").insert(chunkRecords);
+        if (chunkInsertErr) throw new Error(`Failed to create chunk records: ${chunkInsertErr.message}`);
+      }
 
-        try {
-          const prompt = buildPrompt({
-            s3Uri: video.s3_uri,
-            deliveryLabel,
-            deliveryTarget,
-            contentType,
-            chunkContext: {
-              index: chunkNum,
-              total: chunks.length,
-              startMin: Math.round(chunk.start_sec / 60),
-              endMin: Math.round(chunk.end_sec / 60),
-              totalMin,
-            },
-          });
+      // Re-fetch chunks to find the next pending one
+      const { data: allChunks } = await supabase
+        .from("analysis_chunks")
+        .select("chunk_index, start_sec, end_sec, overlap_start_sec, overlap_end_sec, status")
+        .eq("project_id", projectId)
+        .order("chunk_index");
 
-          const { result: analysis, logs: chunkLogs } = await callPegasus(prompt, projectId);
-          await flushLogs(supabase, chunkLogs);
+      if (!allChunks || allChunks.length === 0) throw new Error("No chunk records found");
 
-          if (analysis.segments.length === 0) {
-            console.warn(`[analyze-video] Chunk ${chunkNum} returned 0 valid segments after normalization`);
-          }
+      const totalChunks = allChunks.length;
+      const completedCount = allChunks.filter((c: any) => c.status === "complete").length;
+      const failedChunk = allChunks.find((c: any) => c.status === "failed");
+      const nextPending = allChunks.find((c: any) => c.status === "pending" || c.status === "analyzing");
 
-          await supabase.from("analysis_chunks").update({
-            status: "complete",
-            pegasus_response: { segments: analysis.segments, breakpoints: analysis.breakpoints, highlights: analysis.highlights },
-          }).eq("project_id", projectId).eq("chunk_index", chunkNum);
+      if (failedChunk && !nextPending) {
+        // A chunk failed previously and no pending work — mark project failed
+        throw new Error(`Chunk ${failedChunk.chunk_index} previously failed`);
+      }
 
-          console.log(`[analyze-video] Chunk ${chunkNum} complete: ${analysis.segments.length}s, ${analysis.breakpoints.length}b, ${analysis.highlights.length}h`);
-        } catch (chunkErr: any) {
-          console.error(`[analyze-video] Chunk ${chunkNum} failed:`, chunkErr.message);
-          await supabase.from("analysis_chunks").update({ status: "failed" }).eq("project_id", projectId).eq("chunk_index", chunkNum);
-          throw new Error(`Chunk ${chunkNum} analysis failed: ${chunkErr.message}`);
+      if (!nextPending) {
+        // All chunks complete — trigger merge
+        console.log(`[analyze-video] All ${totalChunks} chunks complete — dispatching merge for project ${projectId}`);
+        await supabase.from("projects").update({ status: "segments_done" }).eq("id", projectId);
+
+        const mergeUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/merge-analysis-chunks`;
+        const mergeResp = await fetch(mergeUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
+          body: JSON.stringify({ project_id: projectId }),
+        });
+        if (!mergeResp.ok) {
+          const mergeErr = await mergeResp.text();
+          throw new Error(`Merge failed: ${mergeErr}`);
         }
+        console.log(`[analyze-video] Merge dispatch complete for project ${projectId}`);
+
+        return new Response(JSON.stringify({ success: true, project_id: projectId, mode: "multi_pass", phase: "merge_complete" }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
-      // All chunks done — trigger merge
-      console.log(`[analyze-video] All chunks complete, triggering merge for project ${projectId}`);
-      await supabase.from("projects").update({ status: "segments_done" }).eq("id", projectId);
+      // ── Process ONE chunk ──────────────────────────────────────
+      const chunk = nextPending;
+      const chunkNum = chunk.chunk_index;
+      const totalMin = Math.round(durationSec / 60);
 
-      // Invoke merge function
-      const mergeUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/merge-analysis-chunks`;
-      const mergeResp = await fetch(mergeUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
-        body: JSON.stringify({ project_id: projectId }),
-      });
-      if (!mergeResp.ok) {
-        const mergeErr = await mergeResp.text();
-        throw new Error(`Merge failed: ${mergeErr}`);
+      console.log(`[analyze-video] CHUNK START ${chunkNum}/${totalChunks} (${chunk.start_sec}s-${chunk.end_sec}s) for project ${projectId}`);
+      await supabase.from("analysis_chunks").update({ status: "analyzing" }).eq("project_id", projectId).eq("chunk_index", chunkNum);
+
+      try {
+        const prompt = buildPrompt({
+          s3Uri: video.s3_uri,
+          deliveryLabel,
+          deliveryTarget,
+          contentType,
+          chunkContext: {
+            index: chunkNum,
+            total: totalChunks,
+            startMin: Math.round(chunk.start_sec / 60),
+            endMin: Math.round(chunk.end_sec / 60),
+            totalMin,
+          },
+        });
+
+        const { result: analysis, logs: chunkLogs } = await callPegasus(prompt, projectId);
+        await flushLogs(supabase, chunkLogs);
+
+        await supabase.from("analysis_chunks").update({
+          status: "complete",
+          pegasus_response: { segments: analysis.segments, breakpoints: analysis.breakpoints, highlights: analysis.highlights },
+        }).eq("project_id", projectId).eq("chunk_index", chunkNum);
+
+        console.log(`[analyze-video] CHUNK SUCCESS ${chunkNum}/${totalChunks}: ${analysis.segments.length}s, ${analysis.breakpoints.length}b, ${analysis.highlights.length}h`);
+      } catch (chunkErr: any) {
+        console.error(`[analyze-video] CHUNK FAILED ${chunkNum}/${totalChunks}:`, chunkErr.message);
+        await supabase.from("analysis_chunks").update({ status: "failed" }).eq("project_id", projectId).eq("chunk_index", chunkNum);
+        throw new Error(`Chunk ${chunkNum} analysis failed: ${chunkErr.message}`);
       }
-      console.log(`[analyze-video] Merge complete for project ${projectId}`);
+
+      // ── Fire-and-forget: re-invoke self for next chunk ─────────
+      const remainingAfterThis = totalChunks - (completedCount + 1);
+      if (remainingAfterThis > 0) {
+        console.log(`[analyze-video] NEXT-CHUNK DISPATCH: ${remainingAfterThis} chunks remaining for project ${projectId}`);
+        const selfUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/analyze-video`;
+        // Fire-and-forget — don't await the full response
+        fetch(selfUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
+          body: JSON.stringify({ project_id: projectId }),
+        }).catch((e) => console.error(`[analyze-video] Self-invoke failed:`, e.message));
+      } else {
+        // This was the last chunk — re-invoke to trigger merge path
+        console.log(`[analyze-video] FINAL CHUNK DONE — re-invoking for merge dispatch, project ${projectId}`);
+        const selfUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/analyze-video`;
+        fetch(selfUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
+          body: JSON.stringify({ project_id: projectId }),
+        }).catch((e) => console.error(`[analyze-video] Self-invoke for merge failed:`, e.message));
+      }
     }
 
     return new Response(JSON.stringify({ success: true, project_id: projectId, mode: useMultiPass ? "multi_pass" : "single_pass" }), {
