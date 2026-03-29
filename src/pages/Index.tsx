@@ -360,9 +360,25 @@ const Index = () => {
   return (
     <div className="p-8 max-w-[1200px] mx-auto">
       {/* Page Header */}
-      <div className="mb-8">
-        <h2 className="text-xl font-bold text-foreground tracking-tight">New Intelligence Analysis</h2>
-        <p className="text-sm text-muted-foreground mt-1">Configure your video parameters for deep act-structure detection.</p>
+      <div className="mb-8 flex items-end justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-foreground tracking-tight">New Intelligence Analysis</h2>
+          <p className="text-sm text-muted-foreground mt-1">Configure your video parameters for deep act-structure detection.</p>
+        </div>
+
+        {/* Demo mode trigger — only visible with ?demo=1 or Ctrl+Shift+D */}
+        {demoMode && (
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2 text-xs h-9 rounded-xl border-amber-500/30 bg-amber-500/5 text-amber-400 hover:bg-amber-500/10 hover:border-amber-500/50 transition-all animate-fade-in"
+            onClick={handleRunDemo}
+            disabled={isBusy}
+          >
+            {demoLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FlaskConical className="h-3.5 w-3.5" />}
+            {demoLoading ? "Creating demo…" : "Run Sample Analysis"}
+          </Button>
+        )}
       </div>
 
       <div className="flex gap-8">
