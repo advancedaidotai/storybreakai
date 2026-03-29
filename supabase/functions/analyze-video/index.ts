@@ -316,23 +316,42 @@ async function callPegasus(
   });
 
   let bedrockData: any;
-  try {
-    const command = new InvokeModelCommand({
-      modelId: "twelvelabs.pegasus-1-2-v1:0",
-      contentType: "application/json",
-      accept: "application/json",
-      body: JSON.stringify({
-        inputPrompt: prompt,
-        mediaSource: {
-          s3Location: {
-            uri: s3Uri,
-            bucketOwner: awsAccountId,
-          },
-        },
-      }),
-    });
 
-    const response = await bedrockClient.send(command);
+  const command = new InvokeModelCommand({
+    modelId: "twelvelabs.pegasus-1-2-v1:0",
+    contentType: "application/json",
+    accept: "application/json",
+    body: JSON.stringify({
+      inputPrompt: prompt,
+      mediaSource: {
+        s3Location: {
+          uri: s3Uri,
+          bucketOwner: awsAccountId,
+        },
+      },
+    }),
+  });
+
+  const sendWithTimeout = async (isRetry = false): Promise<any> => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 180_000); // 3 min timeout
+    try {
+      const response = await bedrockClient.send(command, { abortSignal: controller.signal });
+      clearTimeout(timeout);
+      return response;
+    } catch (err: any) {
+      clearTimeout(timeout);
+      if (!isRetry) {
+        console.warn(`[analyze-video] Bedrock call failed (${err?.message}), retrying in 5s...`);
+        await new Promise((r) => setTimeout(r, 5000));
+        return sendWithTimeout(true);
+      }
+      throw err;
+    }
+  };
+
+  try {
+    const response = await sendWithTimeout();
 
     // Decode Uint8Array response body
     let rawBodyString: string;
@@ -355,7 +374,7 @@ async function callPegasus(
       throw new Error(`Bedrock response is not valid JSON: ${parseErr.message}`);
     }
   } catch (err: any) {
-    throw new Error(`Bedrock SDK invoke failed: ${err?.message || "Unknown Bedrock error"}`);
+    throw new Error(`Bedrock SDK invoke failed after retry: ${err?.message || "Unknown Bedrock error"}`);
   }
 
   let responseText: string;
