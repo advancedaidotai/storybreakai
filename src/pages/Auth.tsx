@@ -88,6 +88,19 @@ export default function Auth() {
           Continue with Google
         </Button>
 
+        <div className="relative my-4">
+          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border/20" /></div>
+          <div className="relative flex justify-center text-xs"><span className="px-2 text-muted-foreground/50" style={{ backgroundColor: "hsl(222 25% 11%)" }}>or</span></div>
+        </div>
+
+        <Button
+          onClick={() => navigate("/", { replace: true })}
+          variant="outline"
+          className="w-full h-11 rounded-xl border-border/20 text-muted-foreground hover:text-foreground font-medium text-sm"
+        >
+          Continue as Guest
+        </Button>
+
         <p className="text-[11px] text-muted-foreground/40 text-center mt-6">
           © 2026{" "}
           <a href="https://AdvancedAI.ai" target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors underline underline-offset-2">
