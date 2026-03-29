@@ -492,7 +492,7 @@ function Timeline({
             return (
               <TimelineTooltip key={bp.id} content={
                 <div className="text-[10px]">
-                  <p className="font-semibold" style={{ color: "#F59E0B" }}>Breakpoint</p>
+                  <p className="font-semibold" style={{ color: "#F59E0B" }}>{bp.valley_type ? `Recommended Pause — ${bp.valley_type.replace("_", " ")}` : "Recommended Ad Break"}</p>
                   <p className="text-muted-foreground font-mono">{formatTime(bp.timestamp_sec)}</p>
                   {bp.valley_type && <p className="text-muted-foreground capitalize">{bp.valley_type.replace("_", " ")}</p>}
                   {bp.reason && <p className="text-muted-foreground mt-1 line-clamp-2">{bp.reason}</p>}
