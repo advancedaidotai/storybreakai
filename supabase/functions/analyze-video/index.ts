@@ -321,20 +321,15 @@ async function callPegasus(
       modelId: "twelvelabs.pegasus-1-2-v1:0",
       contentType: "application/json",
       accept: "application/json",
-      body: new TextEncoder().encode(
-        JSON.stringify({
-          inputPrompt: prompt,
-          mediaSource: {
-            s3Location: {
-              uri: s3Uri,
-              bucketOwner: awsAccountId,
-            },
+      body: JSON.stringify({
+        video: {
+          s3: {
+            bucket: s3Uri.replace("s3://", "").split("/")[0],
+            objectKey: s3Uri.replace("s3://", "").split("/").slice(1).join("/"),
           },
-          maxOutputTokens: 4096,
-          temperature: 0.2,
-          topP: 0.9,
-        }),
-      ),
+        },
+        text: prompt,
+      }),
     });
 
     const response = await bedrockClient.send(command);
