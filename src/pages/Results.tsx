@@ -11,6 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { supabase } from "@/integrations/supabase/client";
+import { SolutionBanner } from "@/components/results/SolutionBanner";
+import { ROICard } from "@/components/results/ROICard";
+import { ComplianceCard } from "@/components/results/ComplianceCard";
+import { SimilarContent } from "@/components/results/SimilarContent";
+import { BusinessCaseButton } from "@/components/results/BusinessCasePDF";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
