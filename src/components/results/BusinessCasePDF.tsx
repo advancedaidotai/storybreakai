@@ -67,12 +67,13 @@ td:last-child{color:#c9d1d9;font-weight:500}
 <tr><td>Highlights</td><td>${highlightCount}</td></tr>
 </table>
 
-<h2>ROI Summary</h2>
+<h2>ROI Summary <span style="font-size:10px;color:#8b949e;font-weight:400">(illustrative estimates)</span></h2>
 <div class="grid">
-<div class="metric"><div class="val">~4.2 hrs</div><div class="sub">per episode</div><div class="lbl">Time Saved</div></div>
-<div class="metric"><div class="val green">~$850</div><div class="sub">per project</div><div class="lbl">Cost Reduction</div></div>
-<div class="metric"><div class="val purple">94.7%</div><div class="sub">scene boundary</div><div class="lbl">Accuracy</div></div>
+<div class="metric"><div class="val">~4.2 hrs</div><div class="sub">per episode (est.)</div><div class="lbl">Time Saved</div></div>
+<div class="metric"><div class="val green">~$850</div><div class="sub">per project (est.)</div><div class="lbl">Cost Reduction</div></div>
+<div class="metric"><div class="val purple">~95%</div><div class="sub">industry benchmark</div><div class="lbl">Accuracy</div></div>
 </div>
+<p style="font-size:10px;color:#484f58;margin-top:8px;text-align:center;font-style:italic">These figures are illustrative industry estimates, not calculated from your specific project data.</p>
 
 <h2>Platform Compliance</h2>
 <table>
