@@ -326,7 +326,7 @@ async function callPegasus(prompt: string, projectId: string): Promise<{ result:
   const bedrockResp = await signedBedrockRequest({
     region: bedrockRegion, accessKey: awsAccessKey, secretKey: awsSecretKey,
     modelId: "twelvelabs.pegasus-1-2-v1:0",
-    body: { inputText: prompt, textGenerationConfig: { maxTokenCount: 4096, temperature: 0.2, topP: 0.9 } },
+    body: { inputText: prompt, textGenerationConfig: { maxTokenCount: 8192, temperature: 0.2, topP: 0.9 } },
   });
 
   if (!bedrockResp.ok) {
