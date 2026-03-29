@@ -1,5 +1,6 @@
 import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { computeROI, ROI_CONSTANTS } from "@/components/results/ROICard";
 
 interface BusinessCaseProps {
   projectTitle: string;
@@ -25,6 +26,8 @@ export function BusinessCaseButton(props: BusinessCaseProps) {
     const { projectTitle, contentType, deliveryTarget, durationSec, segmentCount, breakpointCount, highlightCount } = props;
     const dur = durationSec ? `${Math.floor(durationSec / 60)}m ${Math.floor(durationSec % 60)}s` : "N/A";
 
+    const { timeSaved, costSaved } = computeROI(contentType);
+
     const safeTitle = escapeHtml(projectTitle || "Untitled Project");
     const safeContentType = escapeHtml(contentType?.replace("_", " ") || "N/A");
     const safeDeliveryTarget = escapeHtml(deliveryTarget || "N/A");
@@ -38,11 +41,10 @@ body{font-family:'Helvetica Neue',Arial,sans-serif;background:#0d1117;color:#c9d
 h1{font-size:28px;color:#58a6ff;margin-bottom:4px}
 .subtitle{color:#8b949e;font-size:13px;margin-bottom:32px}
 h2{font-size:16px;color:#f0f6fc;margin:24px 0 12px;padding-bottom:6px;border-bottom:1px solid #21262d}
-.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin:16px 0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0}
 .metric{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:20px;text-align:center}
 .metric .val{font-size:24px;font-weight:700;color:#58a6ff}
 .metric .val.green{color:#3fb950}
-.metric .val.purple{color:#bc8cff}
 .metric .lbl{font-size:10px;color:#8b949e;text-transform:uppercase;letter-spacing:1px;margin-top:4px}
 .metric .sub{font-size:11px;color:#8b949e;margin-top:2px}
 table{width:100%;border-collapse:collapse;margin:12px 0}
@@ -52,6 +54,7 @@ td:last-child{color:#c9d1d9;font-weight:500}
 .check{color:#3fb950;margin-right:6px}
 .footer{margin-top:40px;padding-top:16px;border-top:1px solid #21262d;text-align:center;color:#484f58;font-size:11px}
 .logo{font-size:20px;font-weight:700;color:#58a6ff}
+.disclaimer{font-size:12px;color:#8b949e;margin-top:12px;text-align:center;font-style:italic;line-height:1.5}
 </style></head><body>
 <div class="logo">StoryBreak AI</div>
 <h1>${safeTitle}</h1>
@@ -69,11 +72,10 @@ td:last-child{color:#c9d1d9;font-weight:500}
 
 <h2>ROI Summary <span style="font-size:10px;color:#8b949e;font-weight:400">(illustrative estimates)</span></h2>
 <div class="grid">
-<div class="metric"><div class="val">~4.2 hrs</div><div class="sub">per episode (est.)</div><div class="lbl">Time Saved</div></div>
-<div class="metric"><div class="val green">~$850</div><div class="sub">per project (est.)</div><div class="lbl">Cost Reduction</div></div>
-<div class="metric"><div class="val purple">~95%</div><div class="sub">industry benchmark</div><div class="lbl">Accuracy</div></div>
+<div class="metric"><div class="val">~${timeSaved.toFixed(1)} hrs</div><div class="sub">per project (est.)</div><div class="lbl">Time Saved</div></div>
+<div class="metric"><div class="val green">~$${costSaved}</div><div class="sub">at $${ROI_CONSTANTS.HOURLY_RATE}/hr rate</div><div class="lbl">Cost Reduction</div></div>
 </div>
-<p style="font-size:10px;color:#484f58;margin-top:8px;text-align:center;font-style:italic">These figures are illustrative industry estimates, not calculated from your specific project data.</p>
+<p class="disclaimer">These figures are illustrative industry estimates, not calculated from your specific project data.</p>
 
 <h2>Platform Compliance</h2>
 <table>

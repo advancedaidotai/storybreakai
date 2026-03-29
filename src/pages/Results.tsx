@@ -16,6 +16,7 @@ import { ROICard } from "@/components/results/ROICard";
 import { ComplianceCard } from "@/components/results/ComplianceCard";
 import { SimilarContent } from "@/components/results/SimilarContent";
 import { BusinessCaseButton } from "@/components/results/BusinessCasePDF";
+import { AdBreakStoryboard } from "@/components/results/AdBreakStoryboard";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -212,14 +213,27 @@ function ContentHeader({ project, segments, breakpoints, highlights }: { project
 // ─── Act Structure Overlay ───────────────────────────────────────────────────
 
 function ActOverlay({ contentType, duration, onSelectAct }: { contentType: string | null; duration: number; onSelectAct: (act: SelectedItem) => void }) {
-  if (contentType !== "tv_episode" && contentType !== "feature_film") return null;
-  if (duration < 300) {
+  // Determine structure label based on content_type first, then duration
+  if (contentType === "feature_film") {
+    // Feature films always get 3-Act Structure, even if duration is short
+  } else if (contentType === "tv_episode") {
+    if (duration < 300) {
+      return (
+        <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-muted/20 border border-border/10">
+          <Clock className="h-3 w-3 text-primary/50" />
+          <span className="text-[10px] text-primary/70 font-medium">Episode Structure</span>
+        </div>
+      );
+    }
+  } else if (contentType === "short_form" || duration < 300) {
     return (
       <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-muted/20 border border-border/10">
         <Clock className="h-3 w-3 text-primary/50" />
-        <span className="text-[10px] text-primary/70 font-medium">Short-form structure</span>
+        <span className="text-[10px] text-primary/70 font-medium">Short-form Structure</span>
       </div>
     );
+  } else {
+    return null;
   }
 
   const acts = contentType === "tv_episode" ? TV_ACTS : FILM_ACTS;
@@ -916,7 +930,23 @@ const Results = () => {
 
         if (projRes.data) setProjectInfo(projRes.data as ProjectInfo);
         if (vidRes.data) {
-          setTotalDuration(Number(vidRes.data.duration_sec) || 0);
+          let dur = Number(vidRes.data.duration_sec) || 0;
+          // Fix: if duration is the known bad 3600 default, compute from actual data
+          if (dur === 3600) {
+            const segs = (segRes.data || []) as Segment[];
+            const bps = (bpRes.data || []) as Breakpoint[];
+            const hls = (hlRes.data || []) as Highlight[];
+            const maxTs = Math.max(
+              ...segs.map(s => s.end_sec || 0),
+              ...bps.map(b => b.timestamp_sec || 0),
+              ...hls.map(h => h.end_sec || 0),
+              0
+            );
+            if (maxTs > 0 && maxTs < 3600) {
+              dur = Math.ceil(maxTs * 1.05);
+            }
+          }
+          setTotalDuration(dur);
         }
         if (videoUrlRes?.data?.url) setVideoUrl(videoUrlRes.data.url);
         if (segRes.data) setSegments(segRes.data as Segment[]);
@@ -1077,7 +1107,7 @@ const Results = () => {
                   </Button>
                 </div>
               ) : (
-                <video ref={videoRef} src={videoUrl} className="w-full aspect-video bg-surface-0 object-contain" controls preload="metadata" onError={() => setVideoError(true)} />
+                <video ref={videoRef} src={videoUrl} crossOrigin="anonymous" className="w-full aspect-video bg-surface-0 object-contain" controls preload="metadata" onError={() => setVideoError(true)} />
               )
             ) : <div className="aspect-video bg-surface-0 flex items-center justify-center"><Play className="h-6 w-6 text-muted-foreground/40" /></div>}
             <Badge variant="secondary" className="absolute top-2 left-2 text-[10px] bg-surface-1/90 border-0 text-muted-foreground pointer-events-none">Source Video</Badge>
@@ -1134,12 +1164,17 @@ const Results = () => {
         </div>
       </div>
 
-      {/* Breakpoint Storyboard */}
-      {breakpoints.length > 0 && (
-        <div className="fade-in-600 fade-in-delay-2">
-          <BreakpointStoryboard breakpoints={breakpoints} selected={selected} currentTime={currentTime} onCardClick={handleBreakpointCardClick} />
-        </div>
-      )}
+      {/* Ad Break Storyboard */}
+      <div className="fade-in-600 fade-in-delay-2">
+        <AdBreakStoryboard
+          breakpoints={breakpoints}
+          videoRef={videoRef}
+          onBreakpointSelect={handleBreakpointCardClick}
+          selectedBreakpointId={selected?.kind === "breakpoint" ? selected.data.id : null}
+          currentTime={currentTime}
+          totalDuration={duration}
+        />
+      </div>
 
       {/* Timeline */}
       <div className="fade-in-600 fade-in-delay-3">
@@ -1154,7 +1189,7 @@ const Results = () => {
       {/* Win Strategy Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 fade-in-600">
         <ROICard durationSec={projectInfo.duration_sec} contentType={projectInfo.content_type} deliveryTarget={projectInfo.delivery_target} />
-        <ComplianceCard deliveryTarget={projectInfo.delivery_target} />
+        <ComplianceCard deliveryTarget={projectInfo.delivery_target} breakpoints={breakpoints} totalDuration={duration} />
         <SimilarContent />
       </div>
     </div>
