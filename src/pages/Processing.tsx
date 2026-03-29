@@ -54,7 +54,7 @@ const Processing = () => {
   const [retrying, setRetrying] = useState(false);
   const [chunkProgress, setChunkProgress] = useState<ChunkProgress | null>(null);
   const triggeredAnalyze = useRef(false);
-  const triggeredReel = useRef(false);
+  
 
   // Poll project status + chunk progress
   useEffect(() => {
