@@ -1454,7 +1454,7 @@ const Results = () => {
                   </Button>
                 </div>
               ) : (
-                <video ref={videoRef} src={videoUrl} className="w-full aspect-video bg-surface-0 object-contain" controls preload="metadata" onError={() => setVideoError(true)} />
+                <video ref={videoRef} src={videoUrl} crossOrigin="anonymous" className="w-full aspect-video bg-surface-0 object-contain" controls preload="metadata" onError={() => setVideoError(true)} />
               )
             ) : <div className="aspect-video bg-surface-0 flex items-center justify-center"><Play className="h-6 w-6 text-muted-foreground/40" /></div>}
             <Badge variant="secondary" className="absolute top-2 left-2 text-[10px] bg-surface-1/90 border-0 text-muted-foreground pointer-events-none">Source Video</Badge>
@@ -1468,6 +1468,7 @@ const Results = () => {
               <video
                 ref={previewVideoRef}
                 src={videoUrl}
+                crossOrigin="anonymous"
                 className="w-full aspect-video bg-surface-0 object-contain"
                 muted={previewPhase === "idle"}
                 preload="metadata"
