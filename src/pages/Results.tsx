@@ -1405,7 +1405,7 @@ const Results = () => {
 
         {/* Detail Panel + Scene Index */}
         <div className="fade-in-600 fade-in-delay-3 space-y-4">
-          <DetailPanel selected={selected} onExportJSON={handleExportJSON} onDownloadMasterPackage={handleDownloadMasterPackage} onDownloadFormat={handleDownloadFormat} readiness={readiness} onRetry={handleRetryAnalysis} />
+          <DetailPanel selected={selected} onExportJSON={handleExportJSON} onDownloadMasterPackage={handleDownloadMasterPackage} onDownloadFormat={handleDownloadFormat} readiness={readiness} onRetry={handleRetryAnalysis} exportApprovedOnly={exportApprovedOnly} onToggleApprovedOnly={() => setExportApprovedOnly((v) => !v)} />
           <SceneIndex segments={segments} contentType={projectInfo.content_type} duration={duration} onSelect={handleSelectSegment} />
         </div>
       </div>
