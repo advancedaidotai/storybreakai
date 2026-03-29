@@ -253,7 +253,7 @@ All timestamps in seconds. Return ONLY valid JSON with keys: segments, breakpoin
 
 // ─── Bedrock call with response parsing ──────────────────────────────────────
 
-async function callPegasus(prompt: string): Promise<AnalysisResult> {
+async function callPegasus(prompt: string, projectId: string): Promise<{ result: AnalysisResult; logs: AnalysisLog[] }> {
   const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY")!;
   const awsSecretKey = Deno.env.get("AWS_SECRET_KEY")!;
   const bedrockRegion = Deno.env.get("BEDROCK_REGION") || "us-east-1";
@@ -278,7 +278,7 @@ async function callPegasus(prompt: string): Promise<AnalysisResult> {
 
   console.log(`[analyze-video] Raw response length: ${responseText.length}`);
   const rawJSON = extractJSON(responseText);
-  return validateAndClean(rawJSON);
+  return validateAndClean(rawJSON, projectId);
 }
 
 // ─── Single-pass insert ──────────────────────────────────────────────────────
