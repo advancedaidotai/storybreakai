@@ -152,6 +152,7 @@ const Index = () => {
   const [urlValidating, setUrlValidating] = useState(false);
   const [urlValid, setUrlValid] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
+  const [codecWarning, setCodecWarning] = useState<string | null>(null);
 
   const config = CONTENT_CONFIGS[contentType];
 
