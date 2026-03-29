@@ -849,7 +849,7 @@ const Results = () => {
     const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `storybreak-${projectId}.json`; a.click(); URL.revokeObjectURL(url);
   }, [segments, breakpoints, highlights, projectId]);
 
-  const handleDownloadReel = useCallback(() => { if (reelUrl) window.open(reelUrl, "_blank"); }, [reelUrl]);
+  
 
   const handleDownloadMasterPackage = useCallback(() => {
     const safeTitle = (projectInfo.title || "StoryBreak-Export").replace(/[^a-zA-Z0-9_-]/g, "_");
