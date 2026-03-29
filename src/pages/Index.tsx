@@ -42,6 +42,33 @@ const Index = () => {
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadProgress, setUploadProgress] = useState(0);
   const [fileName, setFileName] = useState<string>("");
+  const [loadingSample, setLoadingSample] = useState(false);
+
+  const handleTrySample = useCallback(async () => {
+    setLoadingSample(true);
+    setError(null);
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("upload-video", {
+        body: {
+          filename: "sample-video.mp4",
+          content_type: "video/mp4",
+          file_size: 0,
+          duration_sec: 600,
+          is_sample: true,
+          s3_uri_override: "s3://storybreak-ai-videos/samples/sample-video.mp4",
+        },
+      });
+      if (fnError || !data?.project_id) {
+        setError("Failed to load sample video. Please try again.");
+        setLoadingSample(false);
+        return;
+      }
+      navigate(`/processing/${data.project_id}`);
+    } catch {
+      setError("Failed to load sample video.");
+      setLoadingSample(false);
+    }
+  }, [navigate]);
 
   const validateAndUpload = useCallback(async (file: File) => {
     setError(null);
@@ -289,11 +316,12 @@ const Index = () => {
 
       {/* Try Sample */}
       <button
-        className="mt-6 flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-colors duration-200"
-        onClick={() => navigate("/processing")}
+        className="mt-6 flex items-center gap-2 text-xs text-muted-foreground hover:text-primary transition-all duration-200 btn-hover disabled:opacity-50"
+        onClick={handleTrySample}
+        disabled={loadingSample || isBusy}
       >
-        <Play className="h-3.5 w-3.5" />
-        <span>Try Sample Video</span>
+        {loadingSample ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+        <span>{loadingSample ? "Loading sample…" : "Try Sample Video"}</span>
       </button>
 
       {/* Footer */}

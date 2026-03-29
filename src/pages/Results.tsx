@@ -48,6 +48,14 @@ const SEGMENT_COLORS: Record<string, string> = {
   resolution: "#8B5CF6",
 };
 
+const SEGMENT_LABELS: Record<string, string> = {
+  opening: "Opening",
+  story_unit: "Story Unit",
+  transition: "Transition",
+  climax: "Climax",
+  resolution: "Resolution",
+};
+
 function formatTime(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
@@ -70,6 +78,39 @@ function s3UriToUrl(uri: string, region: string): string {
   return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
 }
 
+// ─── Skeleton Components ─────────────────────────────────────────────────────
+
+function VideoSkeleton({ label }: { label: string }) {
+  return (
+    <div className="glass-panel rounded-2xl overflow-hidden cinematic-shadow">
+      <div className="relative aspect-video skeleton-shimmer">
+        <Badge variant="secondary" className="absolute top-2 left-2 text-[10px] bg-surface-1/90 border-0 text-muted-foreground pointer-events-none z-10">
+          {label}
+        </Badge>
+      </div>
+    </div>
+  );
+}
+
+function TimelineSkeleton() {
+  return (
+    <div className="glass-panel-elevated rounded-2xl p-5">
+      <div className="flex items-center justify-between mb-3">
+        <div className="h-3 w-48 rounded skeleton-shimmer" />
+        <div className="h-4 w-24 rounded-full skeleton-shimmer" />
+      </div>
+      <div className="h-10 rounded-xl skeleton-shimmer mb-1" />
+      <div className="h-6 rounded skeleton-shimmer mb-1 opacity-60" />
+      <div className="h-6 rounded skeleton-shimmer mb-1 opacity-40" />
+      <div className="flex justify-between mt-2">
+        {Array.from({ length: 7 }).map((_, i) => (
+          <div key={i} className="h-2 w-8 rounded skeleton-shimmer" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 const Results = () => {
@@ -87,7 +128,6 @@ const Results = () => {
   const [selected, setSelected] = useState<SelectedItem | null>(null);
   const [projectTitle, setProjectTitle] = useState("");
 
-  // Fetch all data on mount
   useEffect(() => {
     if (!projectId) return;
 
@@ -120,10 +160,9 @@ const Results = () => {
     fetchAll();
   }, [projectId]);
 
-  // Compute total duration from segments if not from video metadata
   const duration = useMemo(() => {
     if (totalDuration > 0) return totalDuration;
-    if (segments.length === 0) return 600; // fallback 10min
+    if (segments.length === 0) return 600;
     return Math.max(...segments.map((s) => s.end_sec));
   }, [totalDuration, segments]);
 
@@ -165,15 +204,30 @@ const Results = () => {
     window.open(reelUrl, "_blank");
   }, [reelUrl]);
 
-  // Demo mode
-  if (!projectId) {
-    return <DemoResults />;
-  }
+  if (!projectId) return <DemoResults />;
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 text-primary animate-spin" />
+      <div className="flex flex-col px-4 py-4 max-w-[1400px] mx-auto gap-4 animate-fade-in">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-5 w-48 rounded skeleton-shimmer mb-2" />
+            <div className="h-3 w-32 rounded skeleton-shimmer" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_280px] gap-4">
+          <VideoSkeleton label="Source Video" />
+          <VideoSkeleton label="AI Highlight Reel" />
+          <div className="glass-panel rounded-2xl p-4">
+            <div className="h-3 w-24 rounded skeleton-shimmer mb-4" />
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-3 rounded skeleton-shimmer" style={{ width: `${80 - i * 10}%` }} />
+              ))}
+            </div>
+          </div>
+        </div>
+        <TimelineSkeleton />
       </div>
     );
   }
@@ -181,22 +235,22 @@ const Results = () => {
   return (
     <div className="flex flex-col px-4 py-4 max-w-[1400px] mx-auto gap-4 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between fade-in-600">
         <div>
           <h1 className="text-lg font-bold tracking-tight text-foreground truncate max-w-md">{projectTitle || "Analysis Results"}</h1>
           <p className="text-xs text-muted-foreground mt-0.5">
             {segments.length} segments · {breakpoints.length} breakpoints · {highlights.length} highlights
           </p>
         </div>
-        <Button variant="ghost" size="sm" className="text-xs rounded-lg text-muted-foreground" onClick={() => navigate("/")}>
+        <Button variant="ghost" size="sm" className="text-xs rounded-lg text-muted-foreground btn-hover" onClick={() => navigate("/")}>
           ← New Analysis
         </Button>
       </div>
 
       {/* Video Panels + Detail Sidebar */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_280px] gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_280px] xl:grid-cols-[1fr_1fr_320px] gap-4">
         {/* Source Video */}
-        <div className="glass-panel rounded-2xl overflow-hidden cinematic-shadow">
+        <div className="glass-panel rounded-2xl overflow-hidden cinematic-shadow fade-in-600 fade-in-delay-1">
           <div className="relative">
             {videoUrl ? (
               <video
@@ -218,7 +272,7 @@ const Results = () => {
         </div>
 
         {/* Highlight Reel */}
-        <div className="glass-panel rounded-2xl overflow-hidden glow-blue cinematic-shadow">
+        <div className="glass-panel rounded-2xl overflow-hidden glow-blue cinematic-shadow fade-in-600 fade-in-delay-2">
           <div className="relative">
             {reelUrl ? (
               <video
@@ -239,28 +293,75 @@ const Results = () => {
         </div>
 
         {/* Detail Panel */}
-        <DetailPanel
-          selected={selected}
-          onExportJSON={handleExportJSON}
-          onDownloadReel={handleDownloadReel}
-          reelUrl={reelUrl}
-        />
+        <div className="fade-in-600 fade-in-delay-3">
+          <DetailPanel
+            selected={selected}
+            onExportJSON={handleExportJSON}
+            onDownloadReel={handleDownloadReel}
+            reelUrl={reelUrl}
+          />
+        </div>
       </div>
 
-      {/* Sequence Intelligence Timeline */}
-      <Timeline
-        segments={segments}
-        breakpoints={breakpoints}
-        highlights={highlights}
-        duration={duration}
-        selected={selected}
-        onSelectSegment={handleSelectSegment}
-        onSelectBreakpoint={handleSelectBreakpoint}
-        onSelectHighlight={handleSelectHighlight}
-      />
+      {/* Timeline */}
+      <div className="fade-in-600 fade-in-delay-3">
+        <Timeline
+          segments={segments}
+          breakpoints={breakpoints}
+          highlights={highlights}
+          duration={duration}
+          selected={selected}
+          onSelectSegment={handleSelectSegment}
+          onSelectBreakpoint={handleSelectBreakpoint}
+          onSelectHighlight={handleSelectHighlight}
+        />
+      </div>
     </div>
   );
 };
+
+// ─── Timeline Tooltip ────────────────────────────────────────────────────────
+
+function TimelineTooltip({
+  children,
+  content,
+}: {
+  children: React.ReactNode;
+  content: React.ReactNode;
+}) {
+  const [show, setShow] = useState(false);
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  const ref = useRef<HTMLDivElement>(null);
+
+  const handleEnter = (e: React.MouseEvent) => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    setPos({ x: rect.left + rect.width / 2, y: rect.top });
+    setShow(true);
+  };
+
+  return (
+    <div
+      ref={ref}
+      onMouseEnter={handleEnter}
+      onMouseLeave={() => setShow(false)}
+      className="relative"
+    >
+      {children}
+      {show && (
+        <div
+          className="fixed z-50 glass-tooltip rounded-xl px-3 py-2 pointer-events-none animate-fade-in max-w-[220px]"
+          style={{
+            left: pos.x,
+            top: pos.y - 8,
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          {content}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── Timeline Component ──────────────────────────────────────────────────────
 
@@ -285,7 +386,6 @@ function Timeline({
 }) {
   const maxScore = useMemo(() => Math.max(...highlights.map((h) => h.score || 1), 1), [highlights]);
 
-  // Time labels
   const timeLabels = useMemo(() => {
     const count = 7;
     const step = duration / (count - 1);
@@ -304,7 +404,7 @@ function Timeline({
       </div>
 
       {/* Layer 1: Segments */}
-      <div className="relative h-10 bg-surface-0/60 rounded-xl overflow-hidden border border-border/20 mb-1">
+      <div className="relative h-10 bg-surface-0/60 rounded-xl overflow-visible border border-border/20 mb-2">
         {segments.map((seg) => {
           const left = (seg.start_sec / duration) * 100;
           const width = ((seg.end_sec - seg.start_sec) / duration) * 100;
@@ -312,72 +412,102 @@ function Timeline({
           const isSelected = selected?.kind === "segment" && selected.data.id === seg.id;
 
           return (
-            <div
+            <TimelineTooltip
               key={seg.id}
-              className={`absolute top-1 bottom-1 rounded-lg cursor-pointer transition-all duration-200 hover:opacity-100 ${
-                isSelected ? "opacity-100 ring-1 ring-white/40" : "opacity-60"
-              }`}
-              style={{
-                left: `${left}%`,
-                width: `${Math.max(width, 0.5)}%`,
-                backgroundColor: color,
-              }}
-              title={`${seg.type}: ${formatTime(seg.start_sec)} → ${formatTime(seg.end_sec)}`}
-              onClick={() => onSelectSegment(seg)}
-            />
+              content={
+                <div className="text-[10px]">
+                  <p className="font-semibold text-foreground capitalize">{seg.type.replace("_", " ")}</p>
+                  <p className="text-muted-foreground font-mono">{formatTime(seg.start_sec)} → {formatTime(seg.end_sec)}</p>
+                  {seg.summary && <p className="text-muted-foreground mt-1 line-clamp-2">{seg.summary}</p>}
+                </div>
+              }
+            >
+              <div
+                className={`absolute top-1 bottom-1 rounded-lg cursor-pointer transition-all duration-200 timeline-segment-glow ${
+                  isSelected ? "opacity-100 ring-1 ring-white/40" : "opacity-60 hover:opacity-90"
+                }`}
+                style={{
+                  left: `${left}%`,
+                  width: `${Math.max(width, 0.5)}%`,
+                  backgroundColor: color,
+                  color: color,
+                }}
+                onClick={() => onSelectSegment(seg)}
+              />
+            </TimelineTooltip>
           );
         })}
       </div>
 
       {/* Layer 2: Breakpoints */}
-      <div className="relative h-6 mb-1">
+      <div className="relative h-7 mb-1">
         {breakpoints.map((bp) => {
           const left = (bp.timestamp_sec / duration) * 100;
           const isSelected = selected?.kind === "breakpoint" && selected.data.id === bp.id;
 
           return (
-            <div
+            <TimelineTooltip
               key={bp.id}
-              className={`absolute top-0 cursor-pointer transition-transform duration-200 hover:scale-125 ${
-                isSelected ? "scale-125" : ""
-              }`}
-              style={{ left: `${left}%`, transform: `translateX(-50%)` }}
-              title={`Breakpoint: ${formatTime(bp.timestamp_sec)}`}
-              onClick={() => onSelectBreakpoint(bp)}
+              content={
+                <div className="text-[10px]">
+                  <p className="font-semibold" style={{ color: "#F59E0B" }}>Breakpoint</p>
+                  <p className="text-muted-foreground font-mono">{formatTime(bp.timestamp_sec)}</p>
+                  <p className="text-muted-foreground capitalize">{(bp.type || "").replace("_", " ")}</p>
+                  {bp.reason && <p className="text-muted-foreground mt-1 line-clamp-2">{bp.reason}</p>}
+                </div>
+              }
             >
-              <Zap
-                className="h-4 w-4"
-                style={{ color: "#F59E0B" }}
-                fill={isSelected ? "#F59E0B" : "none"}
-              />
-            </div>
+              <div
+                className={`absolute top-0 cursor-pointer transition-all duration-200 hover:scale-150 ${
+                  isSelected ? "scale-150 drop-shadow-[0_0_6px_#F59E0B]" : ""
+                }`}
+                style={{ left: `${left}%`, transform: `translateX(-50%)` }}
+                onClick={() => onSelectBreakpoint(bp)}
+              >
+                <Zap
+                  className="h-5 w-5"
+                  style={{ color: "#F59E0B" }}
+                  fill={isSelected ? "#F59E0B" : "none"}
+                />
+              </div>
+            </TimelineTooltip>
           );
         })}
       </div>
 
       {/* Layer 3: Highlights */}
-      <div className="relative h-6 mb-1">
+      <div className="relative h-7 mb-1">
         {highlights.map((hl) => {
           const left = (hl.start_sec / duration) * 100;
           const scoreFrac = (hl.score || 0) / maxScore;
-          const size = 12 + scoreFrac * 8; // 12-20px
+          const size = 14 + scoreFrac * 8;
           const isSelected = selected?.kind === "highlight" && selected.data.id === hl.id;
 
           return (
-            <div
+            <TimelineTooltip
               key={hl.id}
-              className={`absolute top-0 cursor-pointer transition-transform duration-200 hover:scale-125 ${
-                isSelected ? "scale-125" : ""
-              }`}
-              style={{ left: `${left}%`, transform: `translateX(-50%)` }}
-              title={`Highlight: ${formatTime(hl.start_sec)} → ${formatTime(hl.end_sec)} (score: ${hl.score})`}
-              onClick={() => onSelectHighlight(hl)}
+              content={
+                <div className="text-[10px]">
+                  <p className="font-semibold" style={{ color: "#8B5CF6" }}>Highlight #{hl.rank_order ?? "—"}</p>
+                  <p className="text-muted-foreground font-mono">{formatTime(hl.start_sec)} → {formatTime(hl.end_sec)}</p>
+                  <p className="text-muted-foreground">Score: {hl.score ?? "—"}</p>
+                  {hl.reason && <p className="text-muted-foreground mt-1 line-clamp-2">{hl.reason}</p>}
+                </div>
+              }
             >
-              <Star
-                style={{ width: size, height: size, color: "#8B5CF6" }}
-                fill={isSelected ? "#8B5CF6" : "none"}
-              />
-            </div>
+              <div
+                className={`absolute top-0 cursor-pointer transition-all duration-200 hover:scale-150 ${
+                  isSelected ? "scale-150 drop-shadow-[0_0_6px_#8B5CF6]" : ""
+                }`}
+                style={{ left: `${left}%`, transform: `translateX(-50%)` }}
+                onClick={() => onSelectHighlight(hl)}
+              >
+                <Star
+                  style={{ width: size, height: size, color: "#8B5CF6" }}
+                  fill={isSelected ? "#8B5CF6" : "none"}
+                />
+              </div>
+            </TimelineTooltip>
           );
         })}
       </div>
@@ -390,18 +520,18 @@ function Timeline({
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-4 mt-3 text-[10px] text-muted-foreground">
+      <div className="flex flex-wrap gap-x-5 gap-y-1.5 mt-3 pt-3 border-t border-border/15 text-[10px] text-muted-foreground">
         {Object.entries(SEGMENT_COLORS).map(([type, color]) => (
           <span key={type} className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: color }} />
-            {type.replace("_", " ")}
+            <span className="h-2.5 w-5 rounded-sm" style={{ backgroundColor: color, opacity: 0.7 }} />
+            {SEGMENT_LABELS[type] || type}
           </span>
         ))}
         <span className="flex items-center gap-1.5">
-          <Zap className="h-2.5 w-2.5" style={{ color: "#F59E0B" }} /> Breakpoint
+          <Zap className="h-3 w-3" style={{ color: "#F59E0B" }} /> Breakpoint
         </span>
         <span className="flex items-center gap-1.5">
-          <Star className="h-2.5 w-2.5" style={{ color: "#8B5CF6" }} /> Highlight
+          <Star className="h-3 w-3" style={{ color: "#8B5CF6" }} /> Highlight
         </span>
       </div>
     </div>
@@ -422,8 +552,7 @@ function DetailPanel({
   reelUrl: string | null;
 }) {
   return (
-    <div className="glass-panel rounded-2xl p-4 flex flex-col gap-4 h-fit lg:max-h-[calc(56.25vw/2+2rem)] overflow-auto">
-      {/* Detail */}
+    <div className="glass-panel rounded-2xl p-4 flex flex-col gap-4 h-fit lg:sticky lg:top-16 overflow-auto">
       <div>
         <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">
           {selected ? "Element Detail" : "Select an Element"}
@@ -434,29 +563,28 @@ function DetailPanel({
             Click any segment, breakpoint, or highlight on the timeline to inspect it.
           </p>
         ) : selected.kind === "segment" ? (
-          <SegmentDetail seg={selected.data} />
+          <div className="animate-fade-in"><SegmentDetail seg={selected.data} /></div>
         ) : selected.kind === "breakpoint" ? (
-          <BreakpointDetail bp={selected.data} />
+          <div className="animate-fade-in"><BreakpointDetail bp={selected.data} /></div>
         ) : (
-          <HighlightDetail hl={selected.data} />
+          <div className="animate-fade-in"><HighlightDetail hl={selected.data} /></div>
         )}
       </div>
 
-      {/* Export */}
       <div className="border-t border-border/20 pt-4 mt-auto">
         <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">Export</h3>
         <div className="flex flex-col gap-2">
           <Button
             variant="outline"
             size="sm"
-            className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5"
+            className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover"
             onClick={onExportJSON}
           >
             <FileJson className="h-3.5 w-3.5" /> Export JSON
           </Button>
           <Button
             size="sm"
-            className="w-full gap-2 rounded-xl text-xs h-8 glow-blue"
+            className="w-full gap-2 rounded-xl text-xs h-8 glow-blue btn-hover"
             onClick={onDownloadReel}
             disabled={!reelUrl}
           >
@@ -513,7 +641,7 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
 
 function ConfidenceRow({ value }: { value: number | null }) {
   if (value === null) return null;
-  const pct = value > 1 ? value : value * 100; // handle 0-1 or 0-100
+  const pct = value > 1 ? value : value * 100;
   return (
     <div className="flex justify-between">
       <span className="text-muted-foreground">Confidence</span>
@@ -533,8 +661,6 @@ function ReasonBox({ title, text }: { title: string; text: string }) {
   );
 }
 
-// ─── Demo fallback for /results without projectId ────────────────────────────
-
 function DemoResults() {
   const navigate = useNavigate();
   return (
@@ -542,7 +668,7 @@ function DemoResults() {
       <Sparkles className="h-10 w-10 text-primary/40 mb-4" />
       <h1 className="text-xl font-bold text-foreground mb-2">No Project Selected</h1>
       <p className="text-sm text-muted-foreground mb-6">Upload a video to see AI analysis results here.</p>
-      <Button className="rounded-xl glow-blue" onClick={() => navigate("/")}>
+      <Button className="rounded-xl glow-blue btn-hover" onClick={() => navigate("/")}>
         Upload Video
       </Button>
     </div>

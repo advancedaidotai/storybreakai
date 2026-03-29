@@ -105,6 +105,13 @@
     box-shadow: 0 8px 32px -8px hsl(0 0% 0% / 0.5), 0 0 0 1px hsl(var(--border) / 0.2);
   }
 
+  .glass-tooltip {
+    background: hsl(var(--surface-1) / 0.85);
+    backdrop-filter: blur(16px) saturate(1.6);
+    border: 1px solid hsl(var(--border) / 0.6);
+    box-shadow: 0 8px 24px -6px hsl(0 0% 0% / 0.5);
+  }
+
   .glow-blue {
     box-shadow: 0 0 30px -8px hsl(217 91% 60% / 0.25), 0 0 60px -12px hsl(217 91% 60% / 0.1);
   }
@@ -127,5 +134,46 @@
   .surface-interactive:hover {
     background: hsl(var(--surface-2) / 0.8);
     border-color: hsl(var(--border) / 0.8);
+  }
+
+  /* Micro-animations */
+  .btn-hover {
+    @apply transition-all duration-200;
+  }
+  .btn-hover:hover {
+    transform: scale(1.02);
+  }
+  .btn-hover:active {
+    transform: scale(0.98);
+  }
+
+  /* Skeleton shimmer */
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+  .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--surface-1) / 0.6) 25%,
+      hsl(var(--surface-2) / 0.8) 50%,
+      hsl(var(--surface-1) / 0.6) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s ease-in-out infinite;
+  }
+
+  /* Fade-in with delay util */
+  .fade-in-600 {
+    animation: fade-in 600ms ease-out both;
+  }
+  .fade-in-delay-1 { animation-delay: 100ms; }
+  .fade-in-delay-2 { animation-delay: 200ms; }
+  .fade-in-delay-3 { animation-delay: 300ms; }
+
+  /* Timeline segment glow on hover */
+  .timeline-segment-glow:hover {
+    box-shadow: 0 0 12px 2px currentColor;
+    filter: brightness(1.3);
   }
 }
