@@ -186,7 +186,6 @@ function validateAndClean(raw: unknown, projectId: string): { result: AnalysisRe
 
   return { result: { segments, breakpoints, highlights }, logs };
 }
-}
 
 function extractJSON(text: string): unknown {
   try { return JSON.parse(text); } catch { /* continue */ }
