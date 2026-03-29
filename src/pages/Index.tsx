@@ -1,7 +1,7 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useRef, useCallback, useEffect } from "react";
 import RecentProjects from "@/components/RecentProjects";
-import { CloudUpload, Film, AlertCircle, X, Loader2, Tv, Clapperboard, XCircle, Check, Sparkles, FlaskConical, Link2, Coffee } from "lucide-react";
+import { CloudUpload, Film, AlertCircle, X, Loader2, Tv, Clapperboard, XCircle, Check, Sparkles, FlaskConical, Link2, Zap, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
@@ -791,23 +791,52 @@ const Index = () => {
               )}
             </div>
 
-            {/* Info card */}
-            <div className={`${panelStyle} p-4`} style={{ backgroundColor: panelBg }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60">Estimated Analysis Time</p>
-                  <p className="text-sm font-semibold text-foreground mt-0.5">~14 Minutes</p>
+            {/* Business Impact Card */}
+            {(() => {
+              const HOURLY_RATE = 75;
+              const estimatedMinutes = contentType === "feature_film" ? 14 : 8;
+              const manualHours = contentType === "feature_film" ? 4.2 : 2.5;
+              const aiHours = estimatedMinutes / 60;
+              const timeSaved = manualHours - aiHours;
+              const costSaved = Math.round(timeSaved * HOURLY_RATE);
+
+              const complianceRules: Record<string, string> = {
+                youtube: "YouTube · 3-5 min ad intervals",
+                cable_vod: "Cable/VOD · 8-12 min pods",
+                cable: "Cable · 8-12 min commercial pods",
+                broadcast: "Broadcast · Act breaks at 22/44 min",
+                ott: "OTT · Flexible mid-roll placements",
+              };
+              const activeRule = complianceRules[deliveryTarget] || complianceRules.broadcast;
+
+              return (
+                <div className={`${panelStyle} p-4 border-l-2`} style={{ backgroundColor: panelBg, borderLeftColor: "hsl(160 84% 39%)" }}>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Zap className="h-4 w-4 shrink-0" style={{ color: "hsl(160 84% 45%)" }} />
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-foreground/80">Business Impact</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div className="p-2.5 rounded-lg" style={{ backgroundColor: "hsl(160 84% 39% / 0.08)" }}>
+                      <p className="text-[9px] uppercase tracking-wider text-muted-foreground/60">Editor Time Saved</p>
+                      <p className="text-base font-bold text-foreground mt-0.5">~{timeSaved.toFixed(1)} hrs</p>
+                      <p className="text-[9px] text-muted-foreground/50">vs manual scene logging</p>
+                    </div>
+                    <div className="p-2.5 rounded-lg" style={{ backgroundColor: "hsl(160 84% 39% / 0.08)" }}>
+                      <p className="text-[9px] uppercase tracking-wider text-muted-foreground/60">Est. Cost Savings</p>
+                      <p className="text-base font-bold text-foreground mt-0.5">~${costSaved}</p>
+                      <p className="text-[9px] text-muted-foreground/50">at ${HOURLY_RATE}/hr editor rate</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 pt-2.5 border-t border-border/10">
+                    <Shield className="h-3 w-3 shrink-0" style={{ color: "hsl(217 91% 60%)" }} />
+                    <div>
+                      <p className="text-[9px] font-semibold uppercase tracking-wide text-primary/80">Active Compliance Engine</p>
+                      <p className="text-[10px] text-muted-foreground">{activeRule}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60">Credits Required</p>
-                  <p className="text-sm font-semibold text-foreground mt-0.5">4.2 Units</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-1.5 mt-2.5 pt-2.5 border-t border-border/10">
-                <Coffee className="h-3 w-3 text-muted-foreground/40" />
-                <p className="text-[10px] text-muted-foreground/50">Grab a coffee — we'll notify you when it's ready ☕</p>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* Error */}
             {error && (
@@ -843,19 +872,6 @@ const Index = () => {
             <p className="text-[10px] text-muted-foreground/40 text-center leading-relaxed">
               Your video is processed securely and never shared.
             </p>
-
-            {/* AI Tip */}
-            <div className={`${panelStyle} p-4 border-l-2`} style={{ backgroundColor: panelBg, borderLeftColor: "hsl(263 70% 50%)" }}>
-              <div className="flex items-start gap-2.5">
-                <Sparkles className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "hsl(263 70% 60%)" }} />
-                <div>
-                  <p className="text-[11px] font-semibold text-foreground/80 mb-1">Pro Tip</p>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Feature films take longer to analyze — our AI builds a complete semantic map of every scene to find character arcs and story structure automatically.
-                  </p>
-                </div>
-              </div>
-            </div>
 
           </div>
         </div>

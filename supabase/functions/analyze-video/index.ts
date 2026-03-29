@@ -109,9 +109,20 @@ function validateAndClean(raw: unknown, projectId: string): { result: AnalysisRe
   const logs: AnalysisLog[] = [];
   if (!raw || typeof raw !== "object") throw new Error("Response is not an object");
   const obj = raw as Record<string, unknown>;
-  if (!Array.isArray(obj.segments)) throw new Error("Missing segments array");
-  if (!Array.isArray(obj.breakpoints)) throw new Error("Missing breakpoints array");
-  if (!Array.isArray(obj.highlights)) throw new Error("Missing highlights array");
+
+  // Default to empty arrays if missing or malformed (handles truncated JSON)
+  if (!Array.isArray(obj.segments)) {
+    logs.push({ project_id: projectId, log_type: "parse_error", message: `Missing or malformed segments array, defaulting to empty`, raw_data: { got: typeof obj.segments } });
+    obj.segments = [];
+  }
+  if (!Array.isArray(obj.breakpoints)) {
+    logs.push({ project_id: projectId, log_type: "parse_error", message: `Missing or malformed breakpoints array, defaulting to empty`, raw_data: { got: typeof obj.breakpoints } });
+    obj.breakpoints = [];
+  }
+  if (!Array.isArray(obj.highlights)) {
+    logs.push({ project_id: projectId, log_type: "parse_error", message: `Missing or malformed highlights array, defaulting to empty`, raw_data: { got: typeof obj.highlights } });
+    obj.highlights = [];
+  }
 
   // ── Segments: filter invalid, clamp confidence ──
   const segments: RawSegment[] = [];
@@ -189,12 +200,63 @@ function validateAndClean(raw: unknown, projectId: string): { result: AnalysisRe
   return { result: { segments, breakpoints, highlights }, logs };
 }
 
+function repairTruncatedJSON(text: string): string {
+  // Close open strings, arrays, and objects
+  let inString = false;
+  let escape = false;
+  const stack: string[] = [];
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (escape) { escape = false; continue; }
+    if (ch === "\\") { escape = true; continue; }
+    if (inString) {
+      if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') { inString = true; continue; }
+    if (ch === "{") stack.push("}");
+    else if (ch === "[") stack.push("]");
+    else if (ch === "}" || ch === "]") stack.pop();
+  }
+
+  let repaired = text;
+  // Close open string
+  if (inString) repaired += '"';
+  // Remove trailing comma before closing
+  repaired = repaired.replace(/,\s*$/, "");
+  // Close all open brackets/braces in reverse order
+  while (stack.length > 0) repaired += stack.pop();
+  return repaired;
+}
+
 function extractJSON(text: string): unknown {
+  // Direct parse
   try { return JSON.parse(text); } catch { /* continue */ }
+
+  // Code block extraction
   const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-  if (codeBlockMatch) return JSON.parse(codeBlockMatch[1].trim());
+  if (codeBlockMatch) {
+    try { return JSON.parse(codeBlockMatch[1].trim()); } catch {
+      try { return JSON.parse(repairTruncatedJSON(codeBlockMatch[1].trim())); } catch { /* continue */ }
+    }
+  }
+
+  // Brace extraction
   const braceMatch = text.match(/\{[\s\S]*\}/);
-  if (braceMatch) return JSON.parse(braceMatch[0]);
+  if (braceMatch) {
+    try { return JSON.parse(braceMatch[0]); } catch {
+      try { return JSON.parse(repairTruncatedJSON(braceMatch[0])); } catch { /* continue */ }
+    }
+  }
+
+  // Last resort: find the opening brace and repair everything after it
+  const firstBrace = text.indexOf("{");
+  if (firstBrace >= 0) {
+    const partial = text.slice(firstBrace);
+    try { return JSON.parse(repairTruncatedJSON(partial)); } catch { /* continue */ }
+  }
+
   throw new Error("Could not extract JSON from AI response");
 }
 
@@ -264,7 +326,7 @@ async function callPegasus(prompt: string, projectId: string): Promise<{ result:
   const bedrockResp = await signedBedrockRequest({
     region: bedrockRegion, accessKey: awsAccessKey, secretKey: awsSecretKey,
     modelId: "twelvelabs.pegasus-1-2-v1:0",
-    body: { inputText: prompt, textGenerationConfig: { maxTokenCount: 4096, temperature: 0.2, topP: 0.9 } },
+    body: { inputText: prompt, textGenerationConfig: { maxTokenCount: 8192, temperature: 0.2, topP: 0.9 } },
   });
 
   if (!bedrockResp.ok) {
