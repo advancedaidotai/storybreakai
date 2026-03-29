@@ -99,6 +99,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
+  if (req.method === "GET") return new Response(JSON.stringify({ status: "ok", function: "upload-video" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   try {
     const { filename, content_type, file_size, duration_sec, is_sample, s3_uri_override, delivery_target, content_type_enum, content_metadata } = await req.json();

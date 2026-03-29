@@ -127,6 +127,7 @@ async function presignedPartUrl(params: {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "GET") return new Response(JSON.stringify({ status: "ok", function: "multipart-upload" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   try {
     const { action, ...body } = await req.json();

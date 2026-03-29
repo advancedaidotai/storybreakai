@@ -1133,7 +1133,7 @@ const Results = () => {
 
       {/* Win Strategy Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 fade-in-600">
-        <ROICard />
+        <ROICard durationSec={projectInfo.duration_sec} contentType={projectInfo.content_type} deliveryTarget={projectInfo.delivery_target} />
         <ComplianceCard deliveryTarget={projectInfo.delivery_target} />
         <SimilarContent />
       </div>

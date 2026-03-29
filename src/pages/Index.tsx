@@ -797,53 +797,6 @@ const Index = () => {
               )}
             </div>
 
-            {/* Business Impact Card */}
-            {(() => {
-              const HOURLY_RATE = 75;
-              const estimatedMinutes = contentType === "feature_film" ? 14 : 8;
-              const manualHours = contentType === "feature_film" ? 4.2 : 2.5;
-              const aiHours = estimatedMinutes / 60;
-              const timeSaved = manualHours - aiHours;
-              const costSaved = Math.round(timeSaved * HOURLY_RATE);
-
-              const complianceRules: Record<string, string> = {
-                youtube: "YouTube · 3-5 min ad intervals",
-                cable_vod: "Cable/VOD · 8-12 min pods",
-                cable: "Cable · 8-12 min commercial pods",
-                broadcast: "Broadcast · Act breaks at 22/44 min",
-                ott: "OTT · Flexible mid-roll placements",
-              };
-              const activeRule = complianceRules[deliveryTarget] || complianceRules.broadcast;
-
-              return (
-                <div className={`${panelStyle} p-4 border-l-2`} style={{ backgroundColor: panelBg, borderLeftColor: "hsl(160 84% 39%)" }}>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Zap className="h-4 w-4 shrink-0" style={{ color: "hsl(160 84% 45%)" }} />
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-foreground/80">Business Impact</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div className="p-2.5 rounded-lg" style={{ backgroundColor: "hsl(160 84% 39% / 0.08)" }}>
-                      <p className="text-[9px] uppercase tracking-wider text-muted-foreground/60">Editor Time Saved</p>
-                      <p className="text-base font-bold text-foreground mt-0.5">~{timeSaved.toFixed(1)} hrs</p>
-                      <p className="text-[9px] text-muted-foreground/50">vs manual scene logging</p>
-                    </div>
-                    <div className="p-2.5 rounded-lg" style={{ backgroundColor: "hsl(160 84% 39% / 0.08)" }}>
-                      <p className="text-[9px] uppercase tracking-wider text-muted-foreground/60">Est. Cost Savings</p>
-                      <p className="text-base font-bold text-foreground mt-0.5">~${costSaved}</p>
-                      <p className="text-[9px] text-muted-foreground/50">at ${HOURLY_RATE}/hr editor rate</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 pt-2.5 border-t border-border/10">
-                    <Shield className="h-3 w-3 shrink-0" style={{ color: "hsl(217 91% 60%)" }} />
-                    <div>
-                      <p className="text-[9px] font-semibold uppercase tracking-wide text-primary/80">Active Compliance Engine</p>
-                      <p className="text-[10px] text-muted-foreground">{activeRule}</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
             {/* Error */}
             {error && (
               <div className="flex items-start gap-3 p-3.5 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive">
