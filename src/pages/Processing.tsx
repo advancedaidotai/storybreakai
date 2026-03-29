@@ -12,7 +12,6 @@ const STEPS = [
   { key: "analyzing", label: "Analyzing with AI", icon: Brain },
   { key: "segments_done", label: "Detecting Segments", icon: Layers },
   { key: "highlights_done", label: "Identifying Highlights", icon: Sparkles },
-  { key: "generating_reel", label: "Generating Highlight Reel", icon: Film },
 ] as const;
 
 function statusToStepIndex(status: ProjectStatus): number {
