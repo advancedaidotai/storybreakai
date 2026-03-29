@@ -150,14 +150,11 @@ const Processing = () => {
 
   if (!projectId) {
     return (
-      <div className="flex flex-col items-center px-6 py-20 max-w-xl mx-auto">
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Sample Processing</h1>
-        <p className="text-muted-foreground mt-2 text-center text-sm">This is a demo view. Upload a real video to see AI processing in action.</p>
-        <DemoStepper />
-        <div className="flex gap-2 mt-12">
-          <Button variant="ghost" size="sm" className="text-xs h-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => navigate("/")}>← Back</Button>
-          <Button size="sm" className="text-xs h-8 rounded-lg glow-blue" onClick={() => navigate("/results")}>Skip to Results</Button>
-        </div>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-6">
+        <AlertCircle className="h-10 w-10 text-muted-foreground/30 mb-4" />
+        <h1 className="text-xl font-bold text-foreground mb-2">No Active Analysis Found</h1>
+        <p className="text-sm text-muted-foreground mb-6">There's no project being processed at this URL.</p>
+        <Button className="rounded-xl glow-blue" onClick={() => navigate("/")}>Start New Analysis</Button>
       </div>
     );
   }
@@ -255,32 +252,5 @@ const Processing = () => {
     </div>
   );
 };
-
-function DemoStepper() {
-  return (
-    <div className="mt-14 w-full max-w-sm space-y-0">
-      {STEPS.map((step, i) => {
-        const Icon = step.icon;
-        const isDone = i < 2;
-        const isActive = i === 2;
-        return (
-          <div key={step.key} className="flex gap-4">
-            <div className="flex flex-col items-center">
-              <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-all duration-300 ${isDone ? "bg-segment/20 text-segment" : isActive ? "bg-primary/20 text-primary animate-pulse glow-blue" : "bg-surface-2 text-muted-foreground/40"}`}>
-                {isDone ? <Check className="h-4 w-4" /> : isActive ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
-              </div>
-              {i < STEPS.length - 1 && <div className={`w-px flex-1 min-h-[32px] ${isDone ? "bg-segment/30" : "bg-border/30"}`} />}
-            </div>
-            <div className="pb-6">
-              <p className={`font-medium text-sm ${isDone ? "text-foreground" : isActive ? "text-primary" : "text-muted-foreground/50"}`}>{step.label}</p>
-              {isActive && <p className="text-xs text-primary/70 mt-0.5 font-medium tracking-wide uppercase">In progress…</p>}
-              {isDone && <p className="text-xs text-segment/70 mt-0.5">Complete</p>}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 export default Processing;
