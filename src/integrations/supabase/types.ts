@@ -230,6 +230,8 @@ export type Database = {
         | "failed"
         | "generating_reel"
         | "complete"
+        | "segments_done"
+        | "highlights_done"
       segment_type:
         | "opening"
         | "climax"
@@ -372,6 +374,8 @@ export const Constants = {
         "failed",
         "generating_reel",
         "complete",
+        "segments_done",
+        "highlights_done",
       ],
       segment_type: [
         "opening",
