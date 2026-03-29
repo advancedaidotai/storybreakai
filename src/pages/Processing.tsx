@@ -161,8 +161,8 @@ const Processing = () => {
 
   return (
     <div className="flex flex-col items-center px-6 py-20 max-w-xl mx-auto animate-fade-in">
-      <h1 className="text-2xl font-bold tracking-tight text-foreground">Refining Your Vision</h1>
-      <p className="text-muted-foreground mt-2 text-center text-sm">AI is analyzing your footage and constructing an intelligent highlight reel.</p>
+      <h1 className="text-2xl font-bold tracking-tight text-foreground">Working some magic ✨</h1>
+      <p className="text-muted-foreground mt-2 text-center text-sm">Our AI is watching your video and mapping every scene, arc, and highlight. This usually takes a few minutes.</p>
 
       {/* Stepper */}
       <div className="mt-14 w-full max-w-sm space-y-0">
