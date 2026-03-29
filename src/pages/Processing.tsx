@@ -189,7 +189,16 @@ const Processing = () => {
     setError(null);
     setChunkProgress(null);
     triggeredAnalyze.current = false;
-    
+
+    // Clean up stale data from the failed run
+    await Promise.all([
+      supabase.from("segments").delete().eq("project_id", projectId),
+      supabase.from("breakpoints").delete().eq("project_id", projectId),
+      supabase.from("highlights").delete().eq("project_id", projectId),
+      supabase.from("analysis_chunks").delete().eq("project_id", projectId),
+      supabase.from("analysis_logs").delete().eq("project_id", projectId),
+    ]);
+
     await supabase.from("projects").update({ status: "uploaded" as any }).eq("id", projectId);
     setStatus("uploaded");
     setRetrying(false);
