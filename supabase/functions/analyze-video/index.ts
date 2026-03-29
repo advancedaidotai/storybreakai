@@ -321,6 +321,7 @@ Deno.serve(async (req) => {
           const prompt = buildPrompt({
             s3Uri: video.s3_uri,
             deliveryLabel,
+            deliveryTarget,
             contentType,
             chunkContext: {
               index: chunkNum,
