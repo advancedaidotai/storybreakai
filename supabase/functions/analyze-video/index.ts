@@ -508,9 +508,12 @@ async function callPegasus(
       clearTimeout(timeout);
       const errMsg = err?.message || String(err);
 
-      // Check for non-retryable Bedrock errors (video codec/duration issues)
+      // Check for non-retryable Bedrock errors
       if (errMsg.includes("Unprocessable video") || errMsg.includes("error_code\":400")) {
         throw new Error(`Video format not supported by AI model. The video may use an unsupported codec (try H.264/MP4) or exceed the maximum duration per analysis pass. Original error: ${errMsg}`);
+      }
+      if (errMsg.includes("S3Location not found") || errMsg.includes("Provided S3Location")) {
+        throw new Error(`S3Location not found — the video file could not be accessed by the AI model. Please re-upload the video and try again.`);
       }
 
       if (!isRetry) {
