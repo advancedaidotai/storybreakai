@@ -570,7 +570,12 @@ Deno.serve(async (req) => {
     const deliveryTarget = project?.delivery_target || "youtube";
     const deliveryLabel = DELIVERY_LABELS[deliveryTarget] || DELIVERY_LABELS.youtube;
     const contentType = project?.content_type || "short_form";
-    const durationSec = project?.duration_sec || video.duration_sec || 0;
+    let durationSec = project?.duration_sec || video.duration_sec || 0;
+    if (!durationSec || durationSec <= 0) {
+      console.warn(`[analyze-video] duration_sec is 0 or missing for project ${projectId}, defaulting to 3600s`);
+      durationSec = 3600;
+      await supabase.from("projects").update({ duration_sec: 3600 }).eq("id", projectId);
+    }
 
     if (!Deno.env.get("AWS_ACCESS_KEY") || !Deno.env.get("AWS_SECRET_KEY")) throw new Error("AWS credentials not configured");
 

@@ -91,6 +91,7 @@ function confidenceBadgeClasses(c: number | null): string {
 // s3UriToUrl removed — presigned URLs now generated server-side via get-video-url edge function
 
 function formatDurationLong(sec: number): string {
+  if (!sec || sec <= 0) return "Duration pending";
   const h = Math.floor(sec / 3600);
   const m = Math.floor((sec % 3600) / 60);
   if (h > 0) return `${h}h ${m}m`;
