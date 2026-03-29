@@ -786,26 +786,48 @@ const Results = () => {
     return () => vid.removeEventListener("timeupdate", onTime);
   }, [videoUrl]);
 
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   useEffect(() => {
     if (!projectId) return;
     const fetchAll = async () => {
       setLoading(true);
-      const [projRes, vidRes, segRes, bpRes, hlRes, expRes, chunkRes] = await Promise.all([
-        supabase.from("projects").select("title, content_type, content_metadata, delivery_target, duration_sec").eq("id", projectId).single(),
-        supabase.from("videos").select("s3_uri, duration_sec").eq("project_id", projectId).single(),
-        supabase.from("segments").select("*").eq("project_id", projectId).order("start_sec"),
-        supabase.from("breakpoints").select("*").eq("project_id", projectId).order("timestamp_sec"),
-        supabase.from("highlights").select("*").eq("project_id", projectId).order("score", { ascending: false }),
-        supabase.from("exports").select("file_url").eq("project_id", projectId).eq("type", "reel").order("created_at", { ascending: false }).limit(1),
-        supabase.from("analysis_chunks").select("id, chunk_index, start_sec, end_sec, overlap_start_sec, overlap_end_sec").eq("project_id", projectId).order("chunk_index"),
-      ]);
-      if (projRes.data) setProjectInfo(projRes.data as ProjectInfo);
-      if (vidRes.data) { setVideoUrl(s3UriToUrl(vidRes.data.s3_uri || "", "us-east-1")); setTotalDuration(Number(vidRes.data.duration_sec) || 0); }
-      if (segRes.data) setSegments(segRes.data as Segment[]);
-      if (bpRes.data) setBreakpoints(bpRes.data as Breakpoint[]);
-      if (hlRes.data) setHighlights(hlRes.data as Highlight[]);
-      if (expRes.data?.[0]?.file_url) setReelUrl(expRes.data[0].file_url);
-      if (chunkRes.data) setChunks(chunkRes.data as AnalysisChunk[]);
+      setFetchError(null);
+      try {
+        const [projRes, vidRes, segRes, bpRes, hlRes, expRes, chunkRes] = await Promise.all([
+          supabase.from("projects").select("title, content_type, content_metadata, delivery_target, duration_sec").eq("id", projectId).single(),
+          supabase.from("videos").select("s3_uri, duration_sec").eq("project_id", projectId).single(),
+          supabase.from("segments").select("*").eq("project_id", projectId).order("start_sec"),
+          supabase.from("breakpoints").select("*").eq("project_id", projectId).order("timestamp_sec"),
+          supabase.from("highlights").select("*").eq("project_id", projectId).order("score", { ascending: false }),
+          supabase.from("exports").select("file_url").eq("project_id", projectId).eq("type", "reel").order("created_at", { ascending: false }).limit(1),
+          supabase.from("analysis_chunks").select("id, chunk_index, start_sec, end_sec, overlap_start_sec, overlap_end_sec").eq("project_id", projectId).order("chunk_index"),
+        ]);
+
+        if (projRes.error) {
+          console.error("[Results] Failed to fetch project:", projRes.error.message);
+          setFetchError("Project not found or could not be loaded.");
+          setLoading(false);
+          return;
+        }
+
+        if (projRes.data) setProjectInfo(projRes.data as ProjectInfo);
+        if (vidRes.data) { setVideoUrl(s3UriToUrl(vidRes.data.s3_uri || "", "us-east-1")); setTotalDuration(Number(vidRes.data.duration_sec) || 0); }
+        if (segRes.data) setSegments(segRes.data as Segment[]);
+        if (bpRes.data) setBreakpoints(bpRes.data as Breakpoint[]);
+        if (hlRes.data) setHighlights(hlRes.data as Highlight[]);
+        if (expRes.data?.[0]?.file_url) setReelUrl(expRes.data[0].file_url);
+        if (chunkRes.data) setChunks(chunkRes.data as AnalysisChunk[]);
+
+        // Warn if no analysis data found
+        if ((!segRes.data || segRes.data.length === 0) && (!bpRes.data || bpRes.data.length === 0)) {
+          console.warn("[Results] No segments or breakpoints found for project", projectId);
+          setFetchError("No analysis data found for this project. The analysis may still be processing.");
+        }
+      } catch (err: any) {
+        console.error("[Results] Unexpected fetch error:", err);
+        setFetchError("Failed to load results. Please check your connection and try again.");
+      }
       setLoading(false);
     };
     fetchAll();
