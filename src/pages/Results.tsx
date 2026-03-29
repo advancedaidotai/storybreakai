@@ -717,7 +717,6 @@ interface ReadinessInfo {
   analysis: ReadinessState;
   edl: ReadinessState;
   ottJson: ReadinessState;
-  highlightReel: ReadinessState;
 }
 
 // ─── Detail Panel ────────────────────────────────────────────────────────────
