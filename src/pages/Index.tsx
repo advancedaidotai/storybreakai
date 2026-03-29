@@ -79,6 +79,7 @@ const Index = () => {
   const [episodeTitle, setEpisodeTitle] = useState("");
   const [tvStudio, setTvStudio] = useState("");
 
+  const [deliveryTarget, setDeliveryTarget] = useState("broadcast");
   const [touched, setTouched] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [progress, setProgress] = useState<UploadProgress>({ totalParts: 0, completedParts: 0, bytesUploaded: 0, totalBytes: 0, startTime: 0 });
@@ -227,6 +228,7 @@ const Index = () => {
           duration_sec: Math.round(duration),
           content_type_enum: contentType,
           content_metadata: buildMetadata(),
+          delivery_target: deliveryTarget,
         },
       });
 
@@ -386,6 +388,22 @@ const Index = () => {
               />
             </div>
           )}
+        </div>
+
+        {/* Delivery Target */}
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-muted-foreground/60 mb-2 ml-0.5">Delivery Target</p>
+          <select
+            value={deliveryTarget}
+            onChange={(e) => setDeliveryTarget(e.target.value)}
+            disabled={isBusy}
+            className="w-full bg-transparent border-0 border-b border-border/30 rounded-none px-0 h-10 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0 center' }}
+          >
+            <option value="broadcast">Broadcast / Master · Act structures</option>
+            <option value="cable_vod">Cable / VOD · 8-12 min intervals</option>
+            <option value="youtube">YouTube · 3-5 min intervals</option>
+          </select>
         </div>
 
         {/* Drop Zone — compact */}
