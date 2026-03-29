@@ -988,7 +988,19 @@ const Results = () => {
   const handleSelectBreakpoint = useCallback((bp: Breakpoint) => { setSelected({ kind: "breakpoint", data: bp }); seekTo(bp.timestamp_sec); }, [seekTo]);
   const handleSelectHighlight = useCallback((hl: Highlight) => { setSelected({ kind: "highlight", data: hl }); seekTo(hl.start_sec); }, [seekTo]);
   const handleSelectAct = useCallback((act: SelectedItem) => { setSelected(act); if (act.kind === "act") seekTo(act.data.start_sec); }, [seekTo]);
-  const handleBreakpointCardClick = useCallback((bp: Breakpoint) => { setSelected({ kind: "breakpoint", data: bp }); seekTo(Math.max(0, bp.timestamp_sec - 10)); }, [seekTo]);
+  const handleBreakpointCardClick = useCallback((bp: Breakpoint) => {
+    setSelected({ kind: "breakpoint", data: bp });
+    setPreviewPhase("leadin");
+    const targetTime = Math.max(0, bp.timestamp_sec - 10);
+    if (previewVideoRef.current) {
+      previewVideoRef.current.currentTime = targetTime;
+      previewVideoRef.current.play().catch(() => {});
+    }
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = targetTime;
+    }
+  }, []);
 
   const handleExportJSON = useCallback(() => {
     const data = { segments, breakpoints, highlights };
