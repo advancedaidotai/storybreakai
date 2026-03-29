@@ -5,7 +5,7 @@ import {
   Play, Sparkles, Star, FileJson, Zap, Loader2,
   MessageCircle, ArrowRightLeft, Heart, Film, Package,
   Clock, Shield, Timer, Minus, Plus, ChevronLeft, ChevronRight,
-  List, Diamond, MonitorPlay, Clapperboard, AlertCircle, CheckCircle2, XCircle, Ban, RefreshCw,
+  List, Diamond, MonitorPlay, Clapperboard, AlertCircle, CheckCircle2, XCircle, Ban, RefreshCw, AlertTriangle,
 } from "lucide-react";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
