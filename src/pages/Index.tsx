@@ -1,9 +1,20 @@
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useState, useRef, useCallback, useEffect } from "react";
-import { CloudUpload, Film, AlertCircle, X, Loader2, Tv, Clapperboard, XCircle, Check, Sparkles } from "lucide-react";
+import { CloudUpload, Film, AlertCircle, X, Loader2, Tv, Clapperboard, XCircle, Check, Sparkles, FlaskConical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+
+// Known-good sample video for demo verification
+const SAMPLE_VIDEO = {
+  filename: "BigBuckBunny-sample.mp4",
+  s3_uri: "s3://storybreak-ai-videos/samples/big-buck-bunny-trailer.mp4",
+  duration_sec: 596,
+  content_type_enum: "feature_film" as const,
+  title: "Big Buck Bunny",
+  delivery_target: "broadcast",
+};
 
 const ACCEPTED_TYPES = ["video/mp4", "video/quicktime"];
 const ACCEPTED_EXT = [".mp4", ".mov"];
