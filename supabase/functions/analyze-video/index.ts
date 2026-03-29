@@ -28,69 +28,37 @@ async function getSignatureKey(secret: string, date: string, region: string, ser
 }
 
 async function signedBedrockRequest(params: {
-  region: string;
-  accessKey: string;
-  secretKey: string;
-  modelId: string;
-  body: object;
+  region: string; accessKey: string; secretKey: string; modelId: string; body: object;
 }): Promise<Response> {
   const { region, accessKey, secretKey, modelId, body } = params;
   const service = "bedrock";
   const host = `bedrock-runtime.${region}.amazonaws.com`;
   const path = `/model/${encodeURIComponent(modelId)}/invoke`;
   const url = `https://${host}${path}`;
-
   const payload = JSON.stringify(body);
   const payloadBytes = new TextEncoder().encode(payload);
   const payloadHash = await sha256(payloadBytes);
-
   const now = new Date();
   const amzDate = now.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z/, "Z");
   const dateStamp = amzDate.slice(0, 8);
   const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
-
   const canonicalHeaders = `content-type:application/json\nhost:${host}\nx-amz-date:${amzDate}\n`;
   const signedHeaders = "content-type;host;x-amz-date";
-
-  const canonicalRequest = [
-    "POST",
-    path,
-    "",
-    canonicalHeaders,
-    signedHeaders,
-    payloadHash,
-  ].join("\n");
-
+  const canonicalRequest = ["POST", path, "", canonicalHeaders, signedHeaders, payloadHash].join("\n");
   const canonicalRequestHash = await sha256(new TextEncoder().encode(canonicalRequest));
-
-  const stringToSign = [
-    "AWS4-HMAC-SHA256",
-    amzDate,
-    credentialScope,
-    canonicalRequestHash,
-  ].join("\n");
-
+  const stringToSign = ["AWS4-HMAC-SHA256", amzDate, credentialScope, canonicalRequestHash].join("\n");
   const signingKey = await getSignatureKey(secretKey, dateStamp, region, service);
   const signatureBuf = await hmacSHA256(signingKey, stringToSign);
-  const signature = [...new Uint8Array(signatureBuf)]
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-
+  const signature = [...new Uint8Array(signatureBuf)].map((b) => b.toString(16).padStart(2, "0")).join("");
   const authorization = `AWS4-HMAC-SHA256 Credential=${accessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
-
   return fetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Amz-Date": amzDate,
-      Authorization: authorization,
-      Accept: "application/json",
-    },
+    headers: { "Content-Type": "application/json", "X-Amz-Date": amzDate, Authorization: authorization, Accept: "application/json" },
     body: payload,
   });
 }
 
-// ─── Delivery target labels ─────────────────────────────────────────────────
+// ─── Constants & types ───────────────────────────────────────────────────────
 
 const DELIVERY_LABELS: Record<string, string> = {
   youtube: "YouTube (3-5 minute ad-break intervals)",
@@ -98,306 +66,274 @@ const DELIVERY_LABELS: Record<string, string> = {
   broadcast: "Broadcast/Master (act structure breaks)",
 };
 
-// ─── JSON validation ─────────────────────────────────────────────────────────
+const CONTENT_TYPE_PROMPTS: Record<string, string> = {
+  tv_episode: "This is a TV episode. Identify act breaks, cold opens, and commercial break points. Segments should map to TV act structure (teaser/act-1/act-2/act-3/tag).",
+  feature_film: "This is a feature film. Identify three-act structure (setup/confrontation/resolution), major plot points, inciting incident, midpoint reversal, climax, and denouement. Breakpoints should identify natural intermission points and reel changes.",
+};
 
 const SEGMENT_TYPES = ["opening", "climax", "story_unit", "transition", "resolution"];
 const VALLEY_TYPES = ["dialogue_pause", "topic_shift", "emotional_resolution", "scene_transition"];
 
-interface RawSegment {
-  start_sec: number;
-  end_sec: number;
-  type: string;
-  summary?: string;
-  confidence?: number;
-}
-interface RawBreakpoint {
-  timestamp_sec: number;
-  type: string;
-  reason?: string;
-  confidence?: number;
-  lead_in_sec?: number;
-  valley_type?: string;
-  ad_slot_duration_rec?: number;
-  compliance_notes?: string;
-}
-interface RawHighlight {
-  start_sec: number;
-  end_sec: number;
-  score: number;
-  reason?: string;
-  rank_order?: number;
-}
-interface AnalysisResult {
-  segments: RawSegment[];
-  breakpoints: RawBreakpoint[];
-  highlights: RawHighlight[];
-}
+const CHUNK_DURATION = 45 * 60; // 45 min chunks
+const OVERLAP_DURATION = 5 * 60; // 5 min overlap
+const MAX_SINGLE_PASS = 3600; // 60 min
+
+interface RawSegment { start_sec: number; end_sec: number; type: string; summary?: string; confidence?: number; }
+interface RawBreakpoint { timestamp_sec: number; type: string; reason?: string; confidence?: number; lead_in_sec?: number; valley_type?: string; ad_slot_duration_rec?: number; compliance_notes?: string; }
+interface RawHighlight { start_sec: number; end_sec: number; score: number; reason?: string; rank_order?: number; }
+interface AnalysisResult { segments: RawSegment[]; breakpoints: RawBreakpoint[]; highlights: RawHighlight[]; }
 
 function validateAndClean(raw: unknown): AnalysisResult {
   if (!raw || typeof raw !== "object") throw new Error("Response is not an object");
   const obj = raw as Record<string, unknown>;
-
-  if (!Array.isArray(obj.segments) || obj.segments.length === 0) {
-    throw new Error("Missing or empty segments array");
-  }
-  if (!Array.isArray(obj.breakpoints) || obj.breakpoints.length === 0) {
-    throw new Error("Missing or empty breakpoints array");
-  }
-  if (!Array.isArray(obj.highlights) || obj.highlights.length === 0) {
-    throw new Error("Missing or empty highlights array");
-  }
+  if (!Array.isArray(obj.segments) || obj.segments.length === 0) throw new Error("Missing or empty segments array");
+  if (!Array.isArray(obj.breakpoints) || obj.breakpoints.length === 0) throw new Error("Missing or empty breakpoints array");
+  if (!Array.isArray(obj.highlights) || obj.highlights.length === 0) throw new Error("Missing or empty highlights array");
 
   const segments: RawSegment[] = obj.segments.map((s: any, i: number) => {
-    if (typeof s.start_sec !== "number" || typeof s.end_sec !== "number") {
-      throw new Error(`Segment ${i}: missing start_sec/end_sec`);
-    }
-    return {
-      start_sec: s.start_sec,
-      end_sec: s.end_sec,
-      type: SEGMENT_TYPES.includes(s.type) ? s.type : "story_unit",
-      summary: typeof s.summary === "string" ? s.summary : null,
-      confidence: typeof s.confidence === "number" ? s.confidence : null,
-    };
+    if (typeof s.start_sec !== "number" || typeof s.end_sec !== "number") throw new Error(`Segment ${i}: missing start_sec/end_sec`);
+    return { start_sec: s.start_sec, end_sec: s.end_sec, type: SEGMENT_TYPES.includes(s.type) ? s.type : "story_unit", summary: typeof s.summary === "string" ? s.summary : null, confidence: typeof s.confidence === "number" ? s.confidence : null };
   });
 
   const breakpoints: RawBreakpoint[] = obj.breakpoints.map((b: any, i: number) => {
-    if (typeof b.timestamp_sec !== "number") {
-      throw new Error(`Breakpoint ${i}: missing timestamp_sec`);
-    }
+    if (typeof b.timestamp_sec !== "number") throw new Error(`Breakpoint ${i}: missing timestamp_sec`);
     return {
-      timestamp_sec: b.timestamp_sec,
-      type: typeof b.type === "string" ? b.type : "natural_pause",
-      reason: typeof b.reason === "string" ? b.reason : null,
-      confidence: typeof b.confidence === "number" ? b.confidence : null,
-      lead_in_sec: typeof b.lead_in_sec === "number" ? b.lead_in_sec : null,
-      valley_type: VALLEY_TYPES.includes(b.valley_type) ? b.valley_type : null,
-      ad_slot_duration_rec: typeof b.ad_slot_duration_rec === "number" ? b.ad_slot_duration_rec : null,
+      timestamp_sec: b.timestamp_sec, type: typeof b.type === "string" ? b.type : "natural_pause", reason: typeof b.reason === "string" ? b.reason : null,
+      confidence: typeof b.confidence === "number" ? b.confidence : null, lead_in_sec: typeof b.lead_in_sec === "number" ? b.lead_in_sec : null,
+      valley_type: VALLEY_TYPES.includes(b.valley_type) ? b.valley_type : null, ad_slot_duration_rec: typeof b.ad_slot_duration_rec === "number" ? b.ad_slot_duration_rec : null,
       compliance_notes: typeof b.compliance_notes === "string" ? b.compliance_notes : null,
     };
   });
 
   const highlights: RawHighlight[] = obj.highlights.map((h: any, i: number) => {
-    if (typeof h.start_sec !== "number" || typeof h.end_sec !== "number") {
-      throw new Error(`Highlight ${i}: missing start_sec/end_sec`);
-    }
-    return {
-      start_sec: h.start_sec,
-      end_sec: h.end_sec,
-      score: typeof h.score === "number" ? h.score : 0,
-      reason: typeof h.reason === "string" ? h.reason : null,
-      rank_order: typeof h.rank_order === "number" ? h.rank_order : i + 1,
-    };
+    if (typeof h.start_sec !== "number" || typeof h.end_sec !== "number") throw new Error(`Highlight ${i}: missing start_sec/end_sec`);
+    return { start_sec: h.start_sec, end_sec: h.end_sec, score: typeof h.score === "number" ? h.score : 0, reason: typeof h.reason === "string" ? h.reason : null, rank_order: typeof h.rank_order === "number" ? h.rank_order : i + 1 };
   });
 
   return { segments, breakpoints, highlights };
 }
 
-// ─── Extract JSON from possibly-wrapped response ────────────────────────────
-
 function extractJSON(text: string): unknown {
-  try {
-    return JSON.parse(text);
-  } catch { /* continue */ }
-
+  try { return JSON.parse(text); } catch { /* continue */ }
   const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/);
-  if (codeBlockMatch) {
-    return JSON.parse(codeBlockMatch[1].trim());
-  }
-
+  if (codeBlockMatch) return JSON.parse(codeBlockMatch[1].trim());
   const braceMatch = text.match(/\{[\s\S]*\}/);
-  if (braceMatch) {
-    return JSON.parse(braceMatch[0]);
+  if (braceMatch) return JSON.parse(braceMatch[0]);
+  throw new Error("Could not extract JSON from AI response");
+}
+
+// ─── Build prompt ────────────────────────────────────────────────────────────
+
+function buildPrompt(opts: {
+  s3Uri: string; deliveryLabel: string; contentType?: string;
+  chunkContext?: { index: number; total: number; startMin: number; endMin: number; totalMin: number };
+}): string {
+  const { s3Uri, deliveryLabel, contentType, chunkContext } = opts;
+  const contentTypeExtra = contentType && CONTENT_TYPE_PROMPTS[contentType] ? ` ${CONTENT_TYPE_PROMPTS[contentType]}` : "";
+
+  let chunkPrefix = "";
+  if (chunkContext) {
+    chunkPrefix = `You are analyzing chunk ${chunkContext.index} of ${chunkContext.total} (from ${chunkContext.startMin}m to ${chunkContext.endMin}m) of a ${contentType || "video"}. The full video is ${chunkContext.totalMin} minutes. Analyze this portion and return results with timestamps RELATIVE to the start of this chunk (starting at 0). `;
   }
 
-  throw new Error("Could not extract JSON from AI response");
+  return `${chunkPrefix}You are an expert video editor AI specializing in ad-break placement. Analyze the video at ${s3Uri} for ${deliveryLabel} format.${contentTypeExtra} Identify 5-7 optimal ad-break positions by finding Semantic Narrative Valleys - natural pauses in dialogue/action, topic shifts, or emotional resolutions where an ad break feels organic. Rule: Never cut mid-sentence or mid-action. For each breakpoint return: timestamp_sec, lead_in_sec (frame before break), valley_type (dialogue_pause/topic_shift/emotional_resolution/scene_transition), reason, confidence, ad_slot_duration_rec (seconds), compliance_notes. Also return segments (4-8, types: opening/story_unit/transition/climax/resolution with start_sec, end_sec, type, summary, confidence) and highlights (top 5-10 scored by semantic_importance + emotional_intensity + transition_strength + pacing_shift + usability with start_sec, end_sec, score, reason, rank_order). All times in seconds. Return ONLY valid JSON.`;
+}
+
+// ─── Bedrock call with response parsing ──────────────────────────────────────
+
+async function callPegasus(prompt: string): Promise<AnalysisResult> {
+  const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY")!;
+  const awsSecretKey = Deno.env.get("AWS_SECRET_KEY")!;
+  const bedrockRegion = Deno.env.get("BEDROCK_REGION") || "us-east-1";
+
+  const bedrockResp = await signedBedrockRequest({
+    region: bedrockRegion, accessKey: awsAccessKey, secretKey: awsSecretKey,
+    modelId: "twelvelabs.pegasus-1-2-v1:0",
+    body: { inputText: prompt, textGenerationConfig: { maxTokenCount: 4096, temperature: 0.2, topP: 0.9 } },
+  });
+
+  if (!bedrockResp.ok) {
+    const errText = await bedrockResp.text();
+    throw new Error(`Bedrock API error (${bedrockResp.status}): ${errText.slice(0, 500)}`);
+  }
+
+  const bedrockData = await bedrockResp.json();
+  let responseText: string;
+  if (bedrockData?.results?.[0]?.outputText) responseText = bedrockData.results[0].outputText;
+  else if (bedrockData?.output?.text) responseText = bedrockData.output.text;
+  else if (typeof bedrockData?.body === "string") responseText = bedrockData.body;
+  else responseText = JSON.stringify(bedrockData);
+
+  console.log(`[analyze-video] Raw response length: ${responseText.length}`);
+  const rawJSON = extractJSON(responseText);
+  return validateAndClean(rawJSON);
+}
+
+// ─── Single-pass insert ──────────────────────────────────────────────────────
+
+async function insertResults(supabase: any, projectId: string, analysis: AnalysisResult) {
+  const { error: segErr } = await supabase.from("segments").insert(
+    analysis.segments.map((s) => ({ project_id: projectId, start_sec: s.start_sec, end_sec: s.end_sec, type: s.type, summary: s.summary, confidence: s.confidence }))
+  );
+  if (segErr) throw new Error(`Failed to insert segments: ${segErr.message}`);
+
+  const { error: bpErr } = await supabase.from("breakpoints").insert(
+    analysis.breakpoints.map((b) => ({ project_id: projectId, timestamp_sec: b.timestamp_sec, type: b.type, reason: b.reason, confidence: b.confidence, lead_in_sec: b.lead_in_sec, valley_type: b.valley_type, ad_slot_duration_rec: b.ad_slot_duration_rec, compliance_notes: b.compliance_notes }))
+  );
+  if (bpErr) throw new Error(`Failed to insert breakpoints: ${bpErr.message}`);
+
+  const { error: hlErr } = await supabase.from("highlights").insert(
+    analysis.highlights.map((h) => ({ project_id: projectId, start_sec: h.start_sec, end_sec: h.end_sec, score: h.score, reason: h.reason, rank_order: h.rank_order }))
+  );
+  if (hlErr) throw new Error(`Failed to insert highlights: ${hlErr.message}`);
+}
+
+// ─── Chunk boundary calculation ──────────────────────────────────────────────
+
+function calculateChunks(durationSec: number): { start_sec: number; end_sec: number; overlap_start_sec: number | null; overlap_end_sec: number | null }[] {
+  const chunks: { start_sec: number; end_sec: number; overlap_start_sec: number | null; overlap_end_sec: number | null }[] = [];
+  let start = 0;
+  while (start < durationSec) {
+    const end = Math.min(start + CHUNK_DURATION, durationSec);
+    const overlapStart = start > 0 ? start : null;
+    const overlapEnd = start > 0 ? Math.min(start + OVERLAP_DURATION, end) : null;
+    chunks.push({ start_sec: start, end_sec: end, overlap_start_sec: overlapStart, overlap_end_sec: overlapEnd });
+    start = end - OVERLAP_DURATION;
+    if (start >= durationSec) break;
+    if (end >= durationSec) break;
+  }
+  return chunks;
 }
 
 // ─── Main handler ────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-  );
-
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   let projectId: string | undefined;
 
   try {
     const body = await req.json();
     projectId = body.project_id;
-
     if (!projectId || typeof projectId !== "string") {
-      return new Response(JSON.stringify({ error: "project_id is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify({ error: "project_id is required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // 1) Fetch video record
-    const { data: video, error: vidErr } = await supabase
-      .from("videos")
-      .select("s3_uri")
-      .eq("project_id", projectId)
-      .single();
-
+    // Fetch video + project
+    const { data: video, error: vidErr } = await supabase.from("videos").select("s3_uri, duration_sec").eq("project_id", projectId).single();
     if (vidErr || !video?.s3_uri) {
-      return new Response(JSON.stringify({ error: "Video not found for project" }), {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      return new Response(JSON.stringify({ error: "Video not found for project" }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Fetch project to get delivery_target
-    const { data: project } = await supabase
-      .from("projects")
-      .select("delivery_target")
-      .eq("id", projectId)
-      .single();
-
+    const { data: project } = await supabase.from("projects").select("delivery_target, content_type, duration_sec").eq("id", projectId).single();
     const deliveryTarget = project?.delivery_target || "youtube";
     const deliveryLabel = DELIVERY_LABELS[deliveryTarget] || DELIVERY_LABELS.youtube;
+    const contentType = project?.content_type || "short_form";
+    const durationSec = project?.duration_sec || video.duration_sec || 0;
 
-    // 2) Update status to analyzing
+    if (!Deno.env.get("AWS_ACCESS_KEY") || !Deno.env.get("AWS_SECRET_KEY")) throw new Error("AWS credentials not configured");
+
+    // Update status
     await supabase.from("projects").update({ status: "analyzing" }).eq("id", projectId);
 
-    // 3) Call Bedrock with ad-break intelligence prompt
-    const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY");
-    const awsSecretKey = Deno.env.get("AWS_SECRET_KEY");
-    const bedrockRegion = Deno.env.get("BEDROCK_REGION") || "us-east-1";
+    // ─── Strategy router ─────────────────────────────────────────────
+    const useMultiPass = durationSec > MAX_SINGLE_PASS;
 
-    if (!awsAccessKey || !awsSecretKey) {
-      throw new Error("AWS credentials not configured");
-    }
-
-    const prompt = `You are an expert video editor AI specializing in ad-break placement. Analyze the video at ${video.s3_uri} for ${deliveryLabel} format. Identify 5-7 optimal ad-break positions by finding Semantic Narrative Valleys - natural pauses in dialogue/action, topic shifts, or emotional resolutions where an ad break feels organic. Rule: Never cut mid-sentence or mid-action. For each breakpoint return: timestamp_sec, lead_in_sec (frame before break), valley_type (dialogue_pause/topic_shift/emotional_resolution/scene_transition), reason, confidence, ad_slot_duration_rec (seconds), compliance_notes. Also return segments (4-8, types: opening/story_unit/transition/climax/resolution with start_sec, end_sec, type, summary, confidence) and highlights (top 5-10 scored by semantic_importance + emotional_intensity + transition_strength + pacing_shift + usability with start_sec, end_sec, score, reason, rank_order). All times in seconds. Return ONLY valid JSON.`;
-
-    const bedrockBody = {
-      inputText: prompt,
-      textGenerationConfig: {
-        maxTokenCount: 4096,
-        temperature: 0.2,
-        topP: 0.9,
-      },
-    };
-
-    console.log(`[analyze-video] Calling Bedrock for project ${projectId} (target: ${deliveryTarget})`);
-
-    const bedrockResp = await signedBedrockRequest({
-      region: bedrockRegion,
-      accessKey: awsAccessKey,
-      secretKey: awsSecretKey,
-      modelId: "twelvelabs.pegasus-1-2-v1:0",
-      body: bedrockBody,
-    });
-
-    if (!bedrockResp.ok) {
-      const errText = await bedrockResp.text();
-      console.error(`[analyze-video] Bedrock error ${bedrockResp.status}: ${errText}`);
-      throw new Error(`Bedrock API error (${bedrockResp.status}): ${errText.slice(0, 500)}`);
-    }
-
-    const bedrockData = await bedrockResp.json();
-
-    let responseText: string;
-    if (bedrockData?.results?.[0]?.outputText) {
-      responseText = bedrockData.results[0].outputText;
-    } else if (bedrockData?.output?.text) {
-      responseText = bedrockData.output.text;
-    } else if (typeof bedrockData?.body === "string") {
-      responseText = bedrockData.body;
+    if (!useMultiPass) {
+      // ── SINGLE-PASS ──────────────────────────────────────────────
+      console.log(`[analyze-video] SINGLE-PASS for project ${projectId} (${durationSec}s, ${contentType})`);
+      const prompt = buildPrompt({ s3Uri: video.s3_uri, deliveryLabel, contentType });
+      const analysis = await callPegasus(prompt);
+      console.log(`[analyze-video] Parsed: ${analysis.segments.length} segments, ${analysis.breakpoints.length} breakpoints, ${analysis.highlights.length} highlights`);
+      await insertResults(supabase, projectId, analysis);
+      await supabase.from("projects").update({ status: "segments_done" }).eq("id", projectId);
+      await supabase.from("projects").update({ status: "highlights_done" }).eq("id", projectId);
+      console.log(`[analyze-video] Project ${projectId} single-pass complete`);
     } else {
-      responseText = JSON.stringify(bedrockData);
-    }
+      // ── MULTI-PASS ───────────────────────────────────────────────
+      const chunks = calculateChunks(durationSec);
+      const totalMin = Math.round(durationSec / 60);
+      console.log(`[analyze-video] MULTI-PASS for project ${projectId}: ${chunks.length} chunks, ${durationSec}s total`);
 
-    console.log(`[analyze-video] Raw response length: ${responseText.length}`);
-
-    // 4) Parse and validate
-    const rawJSON = extractJSON(responseText);
-    const analysis = validateAndClean(rawJSON);
-
-    console.log(
-      `[analyze-video] Parsed: ${analysis.segments.length} segments, ${analysis.breakpoints.length} breakpoints, ${analysis.highlights.length} highlights`
-    );
-
-    // 5) Bulk insert
-    const { error: segErr } = await supabase.from("segments").insert(
-      analysis.segments.map((s) => ({
+      // Create chunk records
+      const chunkRecords = chunks.map((c, i) => ({
         project_id: projectId!,
-        start_sec: s.start_sec,
-        end_sec: s.end_sec,
-        type: s.type,
-        summary: s.summary,
-        confidence: s.confidence,
-      }))
-    );
-    if (segErr) {
-      console.error("[analyze-video] Segments insert error:", segErr.message);
-      throw new Error(`Failed to insert segments: ${segErr.message}`);
+        chunk_index: i + 1,
+        start_sec: c.start_sec,
+        end_sec: c.end_sec,
+        overlap_start_sec: c.overlap_start_sec,
+        overlap_end_sec: c.overlap_end_sec,
+        status: "pending" as const,
+      }));
+      const { error: chunkInsertErr } = await supabase.from("analysis_chunks").insert(chunkRecords);
+      if (chunkInsertErr) throw new Error(`Failed to create chunk records: ${chunkInsertErr.message}`);
+
+      // Process chunks sequentially
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const chunkNum = i + 1;
+        console.log(`[analyze-video] Processing chunk ${chunkNum}/${chunks.length} (${chunk.start_sec}s - ${chunk.end_sec}s)`);
+
+        await supabase.from("analysis_chunks").update({ status: "analyzing" }).eq("project_id", projectId).eq("chunk_index", chunkNum);
+
+        try {
+          const prompt = buildPrompt({
+            s3Uri: video.s3_uri,
+            deliveryLabel,
+            contentType,
+            chunkContext: {
+              index: chunkNum,
+              total: chunks.length,
+              startMin: Math.round(chunk.start_sec / 60),
+              endMin: Math.round(chunk.end_sec / 60),
+              totalMin,
+            },
+          });
+
+          const analysis = await callPegasus(prompt);
+
+          await supabase.from("analysis_chunks").update({
+            status: "complete",
+            pegasus_response: { segments: analysis.segments, breakpoints: analysis.breakpoints, highlights: analysis.highlights },
+          }).eq("project_id", projectId).eq("chunk_index", chunkNum);
+
+          console.log(`[analyze-video] Chunk ${chunkNum} complete: ${analysis.segments.length}s, ${analysis.breakpoints.length}b, ${analysis.highlights.length}h`);
+        } catch (chunkErr: any) {
+          console.error(`[analyze-video] Chunk ${chunkNum} failed:`, chunkErr.message);
+          await supabase.from("analysis_chunks").update({ status: "failed" }).eq("project_id", projectId).eq("chunk_index", chunkNum);
+          throw new Error(`Chunk ${chunkNum} analysis failed: ${chunkErr.message}`);
+        }
+      }
+
+      // All chunks done — trigger merge
+      console.log(`[analyze-video] All chunks complete, triggering merge for project ${projectId}`);
+      await supabase.from("projects").update({ status: "segments_done" }).eq("id", projectId);
+
+      // Invoke merge function
+      const mergeUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/merge-analysis-chunks`;
+      const mergeResp = await fetch(mergeUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}` },
+        body: JSON.stringify({ project_id: projectId }),
+      });
+      if (!mergeResp.ok) {
+        const mergeErr = await mergeResp.text();
+        throw new Error(`Merge failed: ${mergeErr}`);
+      }
+      console.log(`[analyze-video] Merge complete for project ${projectId}`);
     }
 
-    const { error: bpErr } = await supabase.from("breakpoints").insert(
-      analysis.breakpoints.map((b) => ({
-        project_id: projectId!,
-        timestamp_sec: b.timestamp_sec,
-        type: b.type,
-        reason: b.reason,
-        confidence: b.confidence,
-        lead_in_sec: b.lead_in_sec,
-        valley_type: b.valley_type,
-        ad_slot_duration_rec: b.ad_slot_duration_rec,
-        compliance_notes: b.compliance_notes,
-      }))
-    );
-    if (bpErr) {
-      console.error("[analyze-video] Breakpoints insert error:", bpErr.message);
-      throw new Error(`Failed to insert breakpoints: ${bpErr.message}`);
-    }
-
-    const { error: hlErr } = await supabase.from("highlights").insert(
-      analysis.highlights.map((h) => ({
-        project_id: projectId!,
-        start_sec: h.start_sec,
-        end_sec: h.end_sec,
-        score: h.score,
-        reason: h.reason,
-        rank_order: h.rank_order,
-      }))
-    );
-    if (hlErr) {
-      console.error("[analyze-video] Highlights insert error:", hlErr.message);
-      throw new Error(`Failed to insert highlights: ${hlErr.message}`);
-    }
-
-    // 6) Update status progression
-    await supabase.from("projects").update({ status: "segments_done" }).eq("id", projectId);
-    await supabase.from("projects").update({ status: "highlights_done" }).eq("id", projectId);
-
-    console.log(`[analyze-video] Project ${projectId} analysis complete`);
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        project_id: projectId,
-        segments: analysis.segments.length,
-        breakpoints: analysis.breakpoints.length,
-        highlights: analysis.highlights.length,
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ success: true, project_id: projectId, mode: useMultiPass ? "multi_pass" : "single_pass" }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   } catch (err: any) {
     console.error(`[analyze-video] Error for project ${projectId}:`, err.message);
-
     if (projectId) {
       await supabase.from("projects").update({ status: "failed" }).eq("id", projectId).catch(() => {});
     }
-
-    return new Response(
-      JSON.stringify({ error: err.message || "Analysis failed" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: err.message || "Analysis failed" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });
