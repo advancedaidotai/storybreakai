@@ -236,11 +236,11 @@ const Index = () => {
       setProgress((p) => ({ ...p, completedParts: completedParts.length, bytesUploaded }));
     };
 
-    let idx = 0;
     const runNext = async (): Promise<void> => {
-      while (idx < queue.length) {
+      while (true) {
         if (abortRef.current) throw new Error("Cancelled");
-        const partNum = queue[idx++];
+        const partNum = queue.shift();
+        if (partNum === undefined) break;
         await uploadPart(partNum);
       }
     };
@@ -252,6 +252,7 @@ const Index = () => {
       throw new Error("Cancelled");
     }
 
+    completedParts.sort((a, b) => a.part_number - b.part_number);
     const { data: completeData, error: completeErr } = await supabase.functions.invoke("multipart-upload", {
       body: { action: "complete", s3_key, upload_id, parts: completedParts },
     });
