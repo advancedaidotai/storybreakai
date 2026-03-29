@@ -918,6 +918,7 @@ const Results = () => {
   
   const [totalDuration, setTotalDuration] = useState(0);
   const [selected, setSelected] = useState<SelectedItem | null>(null);
+  const [previewPhase, setPreviewPhase] = useState<"idle" | "leadin" | "ad">("idle");
   const [projectInfo, setProjectInfo] = useState<ProjectInfo>({ title: "", content_type: null, content_metadata: null, delivery_target: null, duration_sec: null });
   const [chunks, setChunks] = useState<AnalysisChunk[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
