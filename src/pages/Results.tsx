@@ -1050,6 +1050,16 @@ const Results = () => {
         </div>
       )}
 
+      {/* Timeline */}
+      <div className="fade-in-600 fade-in-delay-3">
+        <Timeline
+          segments={segments} breakpoints={breakpoints} highlights={highlights}
+          duration={duration} selected={selected} contentType={projectInfo.content_type} chunks={chunks}
+          onSelectSegment={handleSelectSegment} onSelectBreakpoint={handleSelectBreakpoint}
+          onSelectHighlight={handleSelectHighlight} onSelectAct={handleSelectAct}
+        />
+      </div>
+
       {/* Win Strategy Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 fade-in-600">
         <ROICard />
