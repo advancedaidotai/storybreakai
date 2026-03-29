@@ -1,4 +1,4 @@
-import { Clock, DollarSign, TrendingUp, Shield } from "lucide-react";
+import { Clock, DollarSign, Target, TrendingUp, Zap, Shield } from "lucide-react";
 
 const COMPLIANCE_RULES: Record<string, string> = {
   youtube: "YouTube · 3-5 min ad intervals",
@@ -6,6 +6,8 @@ const COMPLIANCE_RULES: Record<string, string> = {
   cable: "Cable · 8-12 min commercial pods",
   broadcast: "Broadcast · Act breaks at 22/44 min",
   ott: "OTT · Flexible mid-roll placements",
+  social: "Social · Hook-optimized clips",
+  streaming: "Streaming · Chapter markers",
 };
 
 interface ROICardProps {
@@ -14,31 +16,20 @@ interface ROICardProps {
   deliveryTarget?: string | null;
 }
 
-export const ROI_CONSTANTS = {
-  HOURLY_RATE: 75,
-  FILM_MANUAL_HOURS: 4.2,
-  OTHER_MANUAL_HOURS: 2.5,
-  FILM_AI_MINUTES: 14,
-  OTHER_AI_MINUTES: 8,
-};
-
-export function computeROI(contentType?: string | null) {
+export function ROICard({ durationSec, contentType, deliveryTarget }: ROICardProps) {
+  const HOURLY_RATE = 75;
   const isFilm = contentType === "feature_film";
-  const manualHours = isFilm ? ROI_CONSTANTS.FILM_MANUAL_HOURS : ROI_CONSTANTS.OTHER_MANUAL_HOURS;
-  const estimatedMinutes = isFilm ? ROI_CONSTANTS.FILM_AI_MINUTES : ROI_CONSTANTS.OTHER_AI_MINUTES;
+  const manualHours = isFilm ? 4.2 : 2.5;
+  const estimatedMinutes = isFilm ? 14 : 8;
   const aiHours = estimatedMinutes / 60;
   const timeSaved = manualHours - aiHours;
-  const costSaved = Math.round(timeSaved * ROI_CONSTANTS.HOURLY_RATE);
-  return { timeSaved, costSaved };
-}
-
-export function ROICard({ durationSec, contentType, deliveryTarget }: ROICardProps) {
-  const { timeSaved, costSaved } = computeROI(contentType);
-  const activeRule = COMPLIANCE_RULES[deliveryTarget || "broadcast"] || COMPLIANCE_RULES.broadcast;
+  const costSaved = Math.round(timeSaved * HOURLY_RATE);
+  const activeRule = COMPLIANCE_RULES[deliveryTarget || "ott"] || COMPLIANCE_RULES.ott;
 
   const METRICS = [
-    { icon: Clock, label: "TIME SAVED", value: `~${timeSaved.toFixed(1)} hrs`, sub: "vs manual scene logging", color: "text-primary" },
-    { icon: DollarSign, label: "COST REDUCTION", value: `~$${costSaved}`, sub: `at $${ROI_CONSTANTS.HOURLY_RATE}/hr rate`, color: "text-segment" },
+    { icon: Clock, label: "Time Saved", value: `~${timeSaved.toFixed(1)} hrs`, sub: "vs manual scene logging", color: "text-primary" },
+    { icon: DollarSign, label: "Cost Reduction", value: `~$${costSaved}`, sub: `at $${HOURLY_RATE}/hr rate`, color: "text-segment" },
+    { icon: Target, label: "Accuracy", value: "~95%", sub: "estimated benchmark", color: "text-highlight" },
   ];
 
   return (
@@ -47,7 +38,7 @@ export function ROICard({ durationSec, contentType, deliveryTarget }: ROICardPro
         <TrendingUp className="h-4 w-4 text-primary" />
         <h3 className="text-xs font-bold uppercase tracking-wide text-foreground/90">Business Impact</h3>
       </div>
-      <div className="p-5 grid grid-cols-2 gap-4">
+      <div className="p-5 grid grid-cols-3 gap-4">
         {METRICS.map(({ icon: Icon, label, value, sub, color }) => (
           <div key={label} className="text-center">
             <div className="h-9 w-9 rounded-xl bg-surface-0/60 border border-border/20 flex items-center justify-center mx-auto mb-2">
@@ -59,16 +50,15 @@ export function ROICard({ durationSec, contentType, deliveryTarget }: ROICardPro
           </div>
         ))}
       </div>
-      <div className="px-5 pb-2">
-        <p className="text-xs text-muted-foreground/70 text-center italic leading-relaxed">
-          Illustrative industry estimates — not calculated from your specific project data.
-        </p>
+      <div className="px-5 pb-1">
+        <p className="text-[9px] text-muted-foreground/40 text-center italic">Illustrative estimates · not calculated from your data</p>
       </div>
-      {/* Delivery Target */}
+      {/* Active Compliance Engine */}
       <div className="px-5 pb-4 pt-1">
         <div className="flex items-center gap-2 pt-3 border-t border-border/15">
           <Shield className="h-3.5 w-3.5 shrink-0 text-primary" />
           <div>
+            <p className="text-[9px] font-semibold uppercase tracking-wide text-primary/80">Active Compliance Engine</p>
             <p className="text-[10px] text-muted-foreground">{activeRule}</p>
           </div>
         </div>

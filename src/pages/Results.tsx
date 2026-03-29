@@ -112,7 +112,8 @@ function generateEDL(breakpoints: Breakpoint[], title: string): string {
       `* VALLEY_TYPE: ${bp.valley_type || "scene_transition"}`,
       `* REASON: ${bp.reason || "Natural narrative pause detected"}`,
       `* CONFIDENCE: ${bp.confidence !== null ? (bp.confidence > 1 ? bp.confidence : (bp.confidence * 100).toFixed(0)) : "N/A"}%`,
-      `* AD_SLOT_DURATION: ${bp.ad_slot_duration_rec ?? 30}s`,
+      `* LEAD_IN: ${bp.lead_in_sec ?? 2}s`,
+      `* AD_SLOT: ${bp.ad_slot_duration_rec ?? 30}s`,
       `* COMPLIANCE: ${bp.compliance_notes || "No specific compliance flags"}`,
       "",
     );
@@ -127,7 +128,7 @@ function generateOTTManifest(breakpoints: Breakpoint[], projectId: string, proje
     generated_at: new Date().toISOString(),
     content_id: projectId,
     content_title: projectInfo.title || "Untitled",
-    delivery_target: projectInfo.delivery_target || "broadcast",
+    delivery_target: projectInfo.delivery_target || "ott",
     total_duration_sec: projectInfo.duration_sec || 0,
     ad_breaks: breakpoints.map((bp, i) => ({
       ad_slot_id: `${projectId}_slot_${i + 1}`,
@@ -137,6 +138,7 @@ function generateOTTManifest(breakpoints: Breakpoint[], projectId: string, proje
       valley_type: bp.valley_type || "scene_transition",
       confidence: bp.confidence,
       reason: bp.reason || "Natural narrative pause detected",
+      lead_in_sec: bp.lead_in_sec ?? 2,
       compliance_notes: bp.compliance_notes || "No specific compliance flags",
       ad_slot_duration_rec: bp.ad_slot_duration_rec ?? 30,
     })),
@@ -213,27 +215,14 @@ function ContentHeader({ project, segments, breakpoints, highlights }: { project
 // ─── Act Structure Overlay ───────────────────────────────────────────────────
 
 function ActOverlay({ contentType, duration, onSelectAct }: { contentType: string | null; duration: number; onSelectAct: (act: SelectedItem) => void }) {
-  // Determine structure label based on content_type first, then duration
-  if (contentType === "feature_film") {
-    // Feature films always get 3-Act Structure, even if duration is short
-  } else if (contentType === "tv_episode") {
-    if (duration < 300) {
-      return (
-        <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-muted/20 border border-border/10">
-          <Clock className="h-3 w-3 text-primary/50" />
-          <span className="text-[10px] text-primary/70 font-medium">Episode Structure</span>
-        </div>
-      );
-    }
-  } else if (contentType === "short_form" || duration < 300) {
+  if (contentType !== "tv_episode" && contentType !== "feature_film") return null;
+  if (duration < 300) {
     return (
       <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-muted/20 border border-border/10">
         <Clock className="h-3 w-3 text-primary/50" />
-        <span className="text-[10px] text-primary/70 font-medium">Short-form Structure</span>
+        <span className="text-[10px] text-primary/70 font-medium">Short-form structure</span>
       </div>
     );
-  } else {
-    return null;
   }
 
   const acts = contentType === "tv_episode" ? TV_ACTS : FILM_ACTS;
@@ -465,7 +454,7 @@ function Timeline({
             return (
               <TimelineTooltip key={seg.id} content={
                 <div className="text-[10px]">
-                  <p className="font-semibold text-foreground capitalize">{seg.type.replace("_", " ")}</p>
+                  <p className="font-semibold text-foreground capitalize">{seg.type === "story_unit" ? "Narrative Beat" : seg.type === "transition" ? "Story Transition" : seg.type === "climax" ? "Dramatic Peak" : seg.type === "resolution" ? "Resolution Arc" : seg.type === "opening" ? "Opening Sequence" : seg.type.replace("_", " ")}</p>
                   <p className="text-muted-foreground font-mono">{formatTime(seg.start_sec)} → {formatTime(seg.end_sec)}</p>
                   {seg.summary && <p className="text-muted-foreground mt-1 line-clamp-2">{seg.summary}</p>}
                 </div>
@@ -506,7 +495,7 @@ function Timeline({
             return (
               <TimelineTooltip key={bp.id} content={
                 <div className="text-[10px]">
-                  <p className="font-semibold" style={{ color: "#F59E0B" }}>Breakpoint</p>
+                  <p className="font-semibold" style={{ color: "#F59E0B" }}>{bp.valley_type ? `Recommended Pause — ${bp.valley_type.replace("_", " ")}` : "Recommended Ad Break"}</p>
                   <p className="text-muted-foreground font-mono">{formatTime(bp.timestamp_sec)}</p>
                   {bp.valley_type && <p className="text-muted-foreground capitalize">{bp.valley_type.replace("_", " ")}</p>}
                   {bp.reason && <p className="text-muted-foreground mt-1 line-clamp-2">{bp.reason}</p>}
@@ -533,6 +522,7 @@ function Timeline({
                   <p className="font-semibold" style={{ color: "#8B5CF6" }}>Highlight #{hl.rank_order ?? "—"}</p>
                   <p className="text-muted-foreground font-mono">{formatTime(hl.start_sec)} → {formatTime(hl.end_sec)}</p>
                   <p className="text-muted-foreground">Score: {hl.score ?? "—"}</p>
+                  {hl.reason && <p className="text-muted-foreground mt-1 line-clamp-2">Selected for: {hl.reason}</p>}
                 </div>
               }>
                 <div className={`absolute top-0 cursor-pointer transition-all duration-200 hover:scale-150 ${isSelected ? "scale-150 drop-shadow-[0_0_6px_#8B5CF6]" : ""}`} style={{ left: `${left}%`, transform: "translateX(-50%)" }} onClick={() => onSelectHighlight(hl)}>
@@ -666,7 +656,7 @@ function BreakpointStoryboard({ breakpoints, selected, currentTime, onCardClick 
                 </div>
                 <div className="min-w-0">
                   <span className="text-xs font-semibold text-foreground block">{valley.label}</span>
-                  <span className="text-[10px] text-muted-foreground">Narrative Valley</span>
+                  <span className="text-[10px] text-muted-foreground">Natural pause for ad placement</span>
                 </div>
               </div>
 
@@ -740,7 +730,7 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, readines
     <div className="glass-panel rounded-2xl p-4 flex flex-col gap-4 h-fit lg:sticky lg:top-16 overflow-auto">
       {/* Element Detail */}
       <div>
-        <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">{selected ? "What We Found" : "Tap to Explore"}</h3>
+        <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">{selected ? "Why We Chose This" : "Tap to Explore"}</h3>
         {!selected ? (
           <p className="text-xs text-muted-foreground/60 leading-relaxed">Click any segment, breakpoint, or highlight on the timeline above to see the details.</p>
         ) : selected.kind === "segment" ? (
@@ -833,23 +823,94 @@ function SegmentDetail({ seg }: { seg: Segment }) {
   );
 }
 
+const VALLEY_EMOJI_DESCRIPTIONS: Record<string, { emoji: string; description: string }> = {
+  dialogue_pause: { emoji: "\u{1F4AC}", description: "Natural gap in conversation" },
+  topic_shift: { emoji: "\u{1F504}", description: "Content transitions to new subject" },
+  emotional_resolution: { emoji: "\u{1FAB7}", description: "Emotional arc completes" },
+  scene_transition: { emoji: "\u{1F3AC}", description: "Visual or narrative scene change" },
+};
+
+function ConfidenceBar({ value }: { value: number | null }) {
+  if (value === null) return null;
+  const pct = Math.round(value * 100);
+  const barColor = value >= 0.85 ? "bg-emerald-500" : value >= 0.65 ? "bg-amber-500" : "bg-red-500";
+  const textColor = value >= 0.85 ? "text-emerald-400" : value >= 0.65 ? "text-amber-400" : "text-red-400";
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-muted-foreground">Confidence</span>
+        <span className={`text-sm font-bold ${textColor}`}>{pct}%</span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-surface-0/80 overflow-hidden">
+        <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function BreakpointDetail({ bp }: { bp: Breakpoint }) {
   const valley = VALLEY_CONFIG[bp.valley_type || ""];
   const ValleyIcon = valley?.icon || Zap;
+  const emojiInfo = VALLEY_EMOJI_DESCRIPTIONS[bp.valley_type || ""] || { emoji: "\u{26A1}", description: "Narrative pause" };
+
   return (
-    <div className="space-y-2.5 text-xs">
-      {valley && (
-        <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-surface-0/60 border border-border/20">
-          <div className="h-8 w-8 rounded-lg bg-surface-1/80 flex items-center justify-center"><ValleyIcon className={`h-4 w-4 ${valley.color}`} /></div>
-          <div><p className="font-semibold text-foreground text-[11px]">{valley.label}</p><p className="text-[10px] text-muted-foreground">Narrative Valley</p></div>
+    <div className="space-y-3 text-xs">
+      {/* AI Logic Header */}
+      <div className="flex items-center gap-2 pb-2 border-b border-border/20">
+        <Sparkles className="h-4 w-4 text-primary" />
+        <span className="text-[11px] font-bold uppercase tracking-wider text-primary">AI Logic</span>
+      </div>
+
+      {/* Valley Type — prominent with emoji */}
+      <div className="flex items-center gap-3 p-3 rounded-xl bg-surface-0/60 border border-border/20">
+        <div className="h-10 w-10 rounded-xl bg-surface-1/80 flex items-center justify-center shrink-0 border border-border/20">
+          <span className="text-xl">{emojiInfo.emoji}</span>
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold text-foreground text-[11px]">{valley?.label || "Natural Pause"}</p>
+          <p className="text-[10px] text-muted-foreground">{emojiInfo.description}</p>
+        </div>
+      </div>
+
+      {/* Why Here? — full reason text */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/60 mb-1.5">Why Here?</p>
+        <div className="p-3 rounded-xl bg-surface-0/60 border border-border/20">
+          <p className="text-[11px] text-muted-foreground leading-relaxed">{bp.reason || "Natural narrative pause detected at this timestamp."}</p>
+        </div>
+      </div>
+
+      {/* Confidence — visual bar */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/60 mb-1.5">Confidence</p>
+        <ConfidenceBar value={bp.confidence} />
+      </div>
+
+      {/* Placement Details */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/60 mb-1.5">Placement Details</p>
+        <div className="space-y-1.5">
+          <Row label="Timestamp" value={formatTime(bp.timestamp_sec)} mono />
+          {bp.lead_in_sec != null && <Row label="Lead-In Time" value={`${bp.lead_in_sec}s before break`} mono />}
+          {bp.ad_slot_duration_rec != null && (
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Recommended Ad Duration</span>
+              <Badge variant="outline" className="text-[10px] border-primary/30 text-primary bg-primary/5">{bp.ad_slot_duration_rec}s</Badge>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Compliance Notes */}
+      {bp.compliance_notes && (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/60 mb-1.5">Compliance</p>
+          <div className="flex items-start gap-2 p-2.5 rounded-xl bg-surface-0/60 border border-border/20">
+            <Shield className="h-3.5 w-3.5 text-muted-foreground/50 mt-0.5 shrink-0" />
+            <p className="text-[10px] text-muted-foreground leading-relaxed">{bp.compliance_notes}</p>
+          </div>
         </div>
       )}
-      <Row label="Timestamp" value={formatTime(bp.timestamp_sec)} mono />
-      {bp.lead_in_sec != null && <Row label="Lead-In" value={`${bp.lead_in_sec}s`} mono />}
-      <ConfidenceRow value={bp.confidence} />
-      {bp.ad_slot_duration_rec && <Row label="Ad Slot Rec." value={`${bp.ad_slot_duration_rec}s`} />}
-      {bp.reason && <ReasonBox title="Why This Break" text={bp.reason} />}
-      {bp.compliance_notes && <ReasonBox title="Compliance Notes" text={bp.compliance_notes} />}
     </div>
   );
 }
@@ -930,23 +991,7 @@ const Results = () => {
 
         if (projRes.data) setProjectInfo(projRes.data as ProjectInfo);
         if (vidRes.data) {
-          let dur = Number(vidRes.data.duration_sec) || 0;
-          // Fix: if duration is the known bad 3600 default, compute from actual data
-          if (dur === 3600) {
-            const segs = (segRes.data || []) as Segment[];
-            const bps = (bpRes.data || []) as Breakpoint[];
-            const hls = (hlRes.data || []) as Highlight[];
-            const maxTs = Math.max(
-              ...segs.map(s => s.end_sec || 0),
-              ...bps.map(b => b.timestamp_sec || 0),
-              ...hls.map(h => h.end_sec || 0),
-              0
-            );
-            if (maxTs > 0 && maxTs < 3600) {
-              dur = Math.ceil(maxTs * 1.05);
-            }
-          }
-          setTotalDuration(dur);
+          setTotalDuration(Number(vidRes.data.duration_sec) || 0);
         }
         if (videoUrlRes?.data?.url) setVideoUrl(videoUrlRes.data.url);
         if (segRes.data) setSegments(segRes.data as Segment[]);
@@ -1107,7 +1152,7 @@ const Results = () => {
                   </Button>
                 </div>
               ) : (
-                <video ref={videoRef} src={videoUrl} crossOrigin="anonymous" className="w-full aspect-video bg-surface-0 object-contain" controls preload="metadata" onError={() => setVideoError(true)} />
+                <video ref={videoRef} src={videoUrl} className="w-full aspect-video bg-surface-0 object-contain" controls preload="metadata" onError={() => setVideoError(true)} />
               )
             ) : <div className="aspect-video bg-surface-0 flex items-center justify-center"><Play className="h-6 w-6 text-muted-foreground/40" /></div>}
             <Badge variant="secondary" className="absolute top-2 left-2 text-[10px] bg-surface-1/90 border-0 text-muted-foreground pointer-events-none">Source Video</Badge>
@@ -1164,7 +1209,7 @@ const Results = () => {
         </div>
       </div>
 
-      {/* Ad Break Storyboard */}
+      {/* Ad Break Storyboard with Thumbnails */}
       <div className="fade-in-600 fade-in-delay-2">
         <AdBreakStoryboard
           breakpoints={breakpoints}
@@ -1189,7 +1234,7 @@ const Results = () => {
       {/* Win Strategy Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 fade-in-600">
         <ROICard durationSec={projectInfo.duration_sec} contentType={projectInfo.content_type} deliveryTarget={projectInfo.delivery_target} />
-        <ComplianceCard deliveryTarget={projectInfo.delivery_target} breakpoints={breakpoints} totalDuration={duration} />
+        <ComplianceCard deliveryTarget={projectInfo.delivery_target} breakpoints={breakpoints} totalDuration={totalDuration || projectInfo.duration_sec} />
         <SimilarContent />
       </div>
     </div>
