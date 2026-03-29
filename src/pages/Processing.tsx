@@ -124,33 +124,14 @@ const Processing = () => {
       });
   }, [projectId, status]);
 
-  // Auto-trigger generate-reel
+  // Skip reel generation — navigate to results once highlights are done
   useEffect(() => {
-    if (!projectId || triggeredReel.current) return;
-    if (status === "ready" || status === "highlights_done") {
-      triggeredReel.current = true;
-      console.log("[Processing] Triggering generate-reel for", projectId);
-      supabase.functions.invoke("generate-reel", { body: { project_id: projectId } })
-        .then(({ data, error: fnErr }) => {
-          if (fnErr) {
-            console.error("[Processing] generate-reel invoke error:", fnErr.message);
-            setError(`Reel generation failed: ${fnErr.message}`);
-            setStatus("failed");
-          } else if (data?.error) {
-            console.error("[Processing] generate-reel returned error:", data.error);
-            setError(`Reel error: ${data.error}`);
-            setStatus("failed");
-          } else {
-            console.log("[Processing] generate-reel invoked successfully");
-          }
-        })
-        .catch((err: any) => {
-          console.error("[Processing] generate-reel unexpected error:", err);
-          setError("Failed to connect to reel service. Please retry.");
-          setStatus("failed");
-        });
+    if (!projectId) return;
+    if (status === "highlights_done" || status === "ready") {
+      console.log("[Processing] Analysis complete — navigating to results");
+      navigate(`/results/${projectId}`, { replace: true });
     }
-  }, [projectId, status]);
+  }, [projectId, status, navigate]);
 
   const handleRetry = useCallback(async () => {
     if (!projectId) return;
