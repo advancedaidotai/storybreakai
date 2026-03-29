@@ -61,6 +61,41 @@ export type Database = {
           },
         ]
       }
+      analysis_logs: {
+        Row: {
+          created_at: string
+          id: string
+          log_type: Database["public"]["Enums"]["analysis_log_type"]
+          message: string | null
+          project_id: string
+          raw_data: Json | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          log_type: Database["public"]["Enums"]["analysis_log_type"]
+          message?: string | null
+          project_id: string
+          raw_data?: Json | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          log_type?: Database["public"]["Enums"]["analysis_log_type"]
+          message?: string | null
+          project_id?: string
+          raw_data?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analysis_logs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       breakpoints: {
         Row: {
           ad_slot_duration_rec: number | null
@@ -295,6 +330,13 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      analysis_log_type:
+        | "skipped_segment"
+        | "skipped_highlight"
+        | "skipped_breakpoint"
+        | "clamped_score"
+        | "parse_error"
+        | "info"
       chunk_status: "pending" | "analyzing" | "complete" | "failed"
       content_type: "short_form" | "tv_episode" | "feature_film"
       export_type: "json" | "reel"
@@ -441,6 +483,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      analysis_log_type: [
+        "skipped_segment",
+        "skipped_highlight",
+        "skipped_breakpoint",
+        "clamped_score",
+        "parse_error",
+        "info",
+      ],
       chunk_status: ["pending", "analyzing", "complete", "failed"],
       content_type: ["short_form", "tv_episode", "feature_film"],
       export_type: ["json", "reel"],
