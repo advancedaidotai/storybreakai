@@ -303,6 +303,7 @@ const Processing = () => {
                     <Progress value={(chunkProgress.completed / chunkProgress.total) * 100} className="h-1.5" />
                     {chunkProgress.currentChunk && (
                       <p className="text-[10px] text-muted-foreground/70">
+                        {/* chunk_index is 1-based from the DB */}
                         Analyzing chunk {chunkProgress.currentChunk.index} of {chunkProgress.total}{" "}
                         <span className="font-mono text-primary/60">
                           ({formatTimeRange(chunkProgress.currentChunk.start_sec, chunkProgress.currentChunk.end_sec)})
