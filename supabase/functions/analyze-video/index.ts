@@ -83,7 +83,9 @@ async function signedBedrockRequest(params: {
 const DELIVERY_LABELS: Record<string, string> = {
   youtube: "YouTube (3-5 minute ad-break intervals)",
   cable_vod: "Cable/VOD (8-12 minute ad-break intervals)",
+  cable: "Cable (8-12 minute ad-break intervals)",
   broadcast: "Broadcast/Master (act structure breaks)",
+  ott: "OTT/Streaming (flexible mid-roll ad placements)",
 };
 
 const CONTENT_TYPE_PROMPTS: Record<string, string> = {
@@ -201,7 +203,9 @@ function extractJSON(text: string): unknown {
 const DELIVERY_PROMPT_RULES: Record<string, string> = {
   youtube: "This is for YouTube delivery. Place ad breaks every 3-5 minutes. Favor frequent, short breaks at conversational pauses or topic transitions. Viewers expect mid-roll ads; place them where engagement dips naturally.",
   cable_vod: "This is for Cable/VOD delivery. Place ad breaks every 8-12 minutes following standard cable commercial pod timing. Align breaks with scene transitions and act-outs. Each break should feel like a natural 'commercial bumper' moment.",
+  cable: "This is for Cable delivery. Place ad breaks every 8-12 minutes following standard cable commercial pod timing. Align breaks with scene transitions and act-outs. Each break should feel like a natural 'commercial bumper' moment.",
   broadcast: "This is for Broadcast/Master delivery. Follow strict broadcast act structure with breaks only at act boundaries. Breaks must align with fade-to-black or established act-out patterns. Compliance with broadcast standards is critical.",
+  ott: "This is for OTT/Streaming delivery. Place mid-roll ad breaks at natural narrative valleys with flexible timing (typically every 5-10 minutes). Optimize for viewer retention — breaks should feel organic, not forced. Favor moments where the viewer would naturally pause. Shorter, more frequent breaks are preferred over long commercial pods.",
 };
 
 function buildPrompt(opts: {
