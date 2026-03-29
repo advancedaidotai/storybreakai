@@ -98,10 +98,13 @@ function validateAndClean(raw: unknown): AnalysisResult {
   const breakpoints: RawBreakpoint[] = obj.breakpoints.map((b: any, i: number) => {
     if (typeof b.timestamp_sec !== "number") throw new Error(`Breakpoint ${i}: missing timestamp_sec`);
     return {
-      timestamp_sec: b.timestamp_sec, type: typeof b.type === "string" ? b.type : "natural_pause", reason: typeof b.reason === "string" ? b.reason : null,
-      confidence: typeof b.confidence === "number" ? b.confidence : null, lead_in_sec: typeof b.lead_in_sec === "number" ? b.lead_in_sec : null,
-      valley_type: VALLEY_TYPES.includes(b.valley_type) ? b.valley_type : null, ad_slot_duration_rec: typeof b.ad_slot_duration_rec === "number" ? b.ad_slot_duration_rec : null,
-      compliance_notes: typeof b.compliance_notes === "string" ? b.compliance_notes : null,
+      timestamp_sec: b.timestamp_sec, type: typeof b.type === "string" ? b.type : "natural_pause",
+      reason: typeof b.reason === "string" ? b.reason : "Natural narrative pause detected",
+      confidence: typeof b.confidence === "number" ? b.confidence : 0.5,
+      lead_in_sec: typeof b.lead_in_sec === "number" ? b.lead_in_sec : 3,
+      valley_type: VALLEY_TYPES.includes(b.valley_type) ? b.valley_type : "scene_transition",
+      ad_slot_duration_rec: typeof b.ad_slot_duration_rec === "number" ? b.ad_slot_duration_rec : 30,
+      compliance_notes: typeof b.compliance_notes === "string" ? b.compliance_notes : "No specific compliance flags",
     };
   });
 
@@ -124,19 +127,56 @@ function extractJSON(text: string): unknown {
 
 // ─── Build prompt ────────────────────────────────────────────────────────────
 
+const DELIVERY_PROMPT_RULES: Record<string, string> = {
+  youtube: "This is for YouTube delivery. Place ad breaks every 3-5 minutes. Favor frequent, short breaks at conversational pauses or topic transitions. Viewers expect mid-roll ads; place them where engagement dips naturally.",
+  cable_vod: "This is for Cable/VOD delivery. Place ad breaks every 8-12 minutes following standard cable commercial pod timing. Align breaks with scene transitions and act-outs. Each break should feel like a natural 'commercial bumper' moment.",
+  broadcast: "This is for Broadcast/Master delivery. Follow strict broadcast act structure with breaks only at act boundaries. Breaks must align with fade-to-black or established act-out patterns. Compliance with broadcast standards is critical.",
+};
+
 function buildPrompt(opts: {
-  s3Uri: string; deliveryLabel: string; contentType?: string;
+  s3Uri: string; deliveryLabel: string; deliveryTarget: string; contentType?: string;
   chunkContext?: { index: number; total: number; startMin: number; endMin: number; totalMin: number };
 }): string {
-  const { s3Uri, deliveryLabel, contentType, chunkContext } = opts;
+  const { s3Uri, deliveryLabel, deliveryTarget, contentType, chunkContext } = opts;
   const contentTypeExtra = contentType && CONTENT_TYPE_PROMPTS[contentType] ? ` ${CONTENT_TYPE_PROMPTS[contentType]}` : "";
+  const deliveryRules = DELIVERY_PROMPT_RULES[deliveryTarget] || DELIVERY_PROMPT_RULES.broadcast;
 
   let chunkPrefix = "";
   if (chunkContext) {
-    chunkPrefix = `You are analyzing chunk ${chunkContext.index} of ${chunkContext.total} (from ${chunkContext.startMin}m to ${chunkContext.endMin}m) of a ${contentType || "video"}. The full video is ${chunkContext.totalMin} minutes. Analyze this portion and return results with timestamps RELATIVE to the start of this chunk (starting at 0). `;
+    chunkPrefix = `You are analyzing chunk ${chunkContext.index} of ${chunkContext.total} (from ${chunkContext.startMin}m to ${chunkContext.endMin}m) of a ${contentType || "video"}. The full video is ${chunkContext.totalMin} minutes. Analyze this portion and return timestamps RELATIVE to the start of this chunk (starting at 0). `;
   }
 
-  return `${chunkPrefix}You are an expert video editor AI specializing in ad-break placement. Analyze the video at ${s3Uri} for ${deliveryLabel} format.${contentTypeExtra} Identify 5-7 optimal ad-break positions by finding Semantic Narrative Valleys - natural pauses in dialogue/action, topic shifts, or emotional resolutions where an ad break feels organic. Rule: Never cut mid-sentence or mid-action. For each breakpoint return: timestamp_sec, lead_in_sec (frame before break), valley_type (dialogue_pause/topic_shift/emotional_resolution/scene_transition), reason, confidence, ad_slot_duration_rec (seconds), compliance_notes. Also return segments (4-8, types: opening/story_unit/transition/climax/resolution with start_sec, end_sec, type, summary, confidence) and highlights (top 5-10 scored by semantic_importance + emotional_intensity + transition_strength + pacing_shift + usability with start_sec, end_sec, score, reason, rank_order). All times in seconds. Return ONLY valid JSON.`;
+  return `${chunkPrefix}You are a senior Broadcast Standards & Practices editor with 20 years of experience in ad-break placement and content segmentation. Your task is to analyze the video at ${s3Uri} for ${deliveryLabel} format and identify optimal ad-break insertion points.${contentTypeExtra}
+
+${deliveryRules}
+
+CRITICAL CONSTRAINTS:
+- NEVER cut mid-sentence or mid-dialogue. Wait for a natural speech pause or sentence completion.
+- NEVER cut mid-action or during a physical movement sequence. Wait for the action to resolve.
+- NEVER cut during high-intensity music, crescendos, or emotional musical peaks. Wait for the music to settle or transition.
+- NEVER place a break within 30 seconds of a previous break ending.
+
+BREAKPOINT DETECTION — Identify 5-7 Semantic Narrative Valleys:
+A Semantic Narrative Valley is a moment where narrative tension, dialogue density, and musical intensity are all simultaneously low — creating an organic pause where an ad break feels natural rather than intrusive.
+
+For each breakpoint return:
+- timestamp_sec: exact second of the proposed break
+- lead_in_sec: seconds before the break where a transition graphic could be inserted (typically 2-5 seconds before)
+- valley_type: one of "dialogue_pause" (gap between speakers or after a monologue), "topic_shift" (conversation changes subject or new scene topic), "emotional_resolution" (emotional beat has resolved, e.g. character makes a decision), "scene_transition" (visual cut between locations or time periods)
+- reason: a detailed 1-2 sentence explanation of WHY this is a good break point, referencing the specific narrative moment
+- confidence: 0.0-1.0 score of break quality
+- ad_slot_duration_rec: recommended ad slot duration in seconds (15, 30, 60, 90, or 120)
+- compliance_notes: any broadcast compliance observations (e.g., "Clean fade to black detected", "Scene ends on wide establishing shot — safe cut point", "No active dialogue or music at this timestamp")
+- type: "natural_pause" or "act_break"
+
+SEGMENTS — Return 4-8 narrative segments:
+Each with start_sec, end_sec, type (opening/story_unit/transition/climax/resolution), summary (1-2 sentence description), confidence (0.0-1.0).
+
+HIGHLIGHTS — Return top 5-10 most engaging moments:
+Score each by: semantic_importance (plot significance) + emotional_intensity (performance energy) + transition_strength (visual dynamism) + pacing_shift (rhythm change) + usability (standalone clip potential).
+Each with start_sec, end_sec, score (0-100), reason (why this moment stands out), rank_order (1 = best).
+
+All timestamps in seconds. Return ONLY valid JSON with keys: segments, breakpoints, highlights.`;
 }
 
 // ─── Bedrock call with response parsing ──────────────────────────────────────
@@ -243,7 +283,7 @@ Deno.serve(async (req) => {
     if (!useMultiPass) {
       // ── SINGLE-PASS ──────────────────────────────────────────────
       console.log(`[analyze-video] SINGLE-PASS for project ${projectId} (${durationSec}s, ${contentType})`);
-      const prompt = buildPrompt({ s3Uri: video.s3_uri, deliveryLabel, contentType });
+      const prompt = buildPrompt({ s3Uri: video.s3_uri, deliveryLabel, deliveryTarget, contentType });
       const analysis = await callPegasus(prompt);
       console.log(`[analyze-video] Parsed: ${analysis.segments.length} segments, ${analysis.breakpoints.length} breakpoints, ${analysis.highlights.length} highlights`);
       await insertResults(supabase, projectId, analysis);
@@ -281,6 +321,7 @@ Deno.serve(async (req) => {
           const prompt = buildPrompt({
             s3Uri: video.s3_uri,
             deliveryLabel,
+            deliveryTarget,
             contentType,
             chunkContext: {
               index: chunkNum,
