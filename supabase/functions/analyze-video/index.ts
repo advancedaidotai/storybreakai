@@ -1,7 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { BedrockRuntimeClient, InvokeModelCommand } from "npm:@aws-sdk/client-bedrock-runtime";
-import { S3Client, PutObjectCommand, HeadObjectCommand } from "npm:@aws-sdk/client-s3";
-import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner";
+import { S3Client, PutObjectCommand, HeadObjectCommand, CreateMultipartUploadCommand, UploadPartCommand, CompleteMultipartUploadCommand, AbortMultipartUploadCommand } from "npm:@aws-sdk/client-s3";
 import { STSClient, GetCallerIdentityCommand } from "npm:@aws-sdk/client-sts";
 
 const corsHeaders = {
@@ -644,7 +643,7 @@ async function ensureS3Uri(
     return currentUri;
   }
 
-  // External URL — download and re-upload to S3
+  // External URL — download and stream-upload to S3 via multipart upload
   if (!currentUri.startsWith("http://") && !currentUri.startsWith("https://")) {
     throw new Error(`Unsupported video URI scheme: ${currentUri.slice(0, 80)}`);
   }
@@ -664,7 +663,7 @@ async function ensureS3Uri(
   const s3Key = `uploads/${projectId}/${originalFilename}`;
   const s3Uri = `s3://${s3Bucket}/${s3Key}`;
 
-  console.log(`[analyze-video] Downloading video from URL to re-upload to S3: ${currentUri.slice(0, 200)}`);
+  console.log(`[analyze-video] Downloading video from URL to stream-upload to S3: ${currentUri.slice(0, 200)}`);
   const MAX_DOWNLOAD_SIZE = 5_368_709_120; // 5 GB
   const dlResp = await fetch(currentUri);
   if (!dlResp.ok) {
@@ -676,8 +675,6 @@ async function ensureS3Uri(
     if (size > MAX_DOWNLOAD_SIZE) {
       throw new Error(`Video file too large (${(size / 1_073_741_824).toFixed(1)} GB). Maximum allowed is 5 GB.`);
     }
-  } else {
-    console.warn(`[analyze-video] No Content-Length header for video URL, proceeding without size check`);
   }
   if (!dlResp.body) {
     throw new Error(`No response body from video URL`);
@@ -685,49 +682,81 @@ async function ensureS3Uri(
 
   const contentType = dlResp.headers.get("content-type") || "video/mp4";
 
-  // Buffer the download into memory so we have a known Content-Length for the S3 PUT.
-  // Streaming a ReadableStream body via fetch() uses chunked transfer encoding,
-  // which S3 presigned PUTs do not support — they require Content-Length.
-  console.log(`[analyze-video] Buffering video download into memory...`);
-  const videoBuffer = new Uint8Array(await dlResp.arrayBuffer());
-  console.log(`[analyze-video] Buffered ${(videoBuffer.byteLength / 1_048_576).toFixed(1)} MB`);
-
-  if (videoBuffer.byteLength > MAX_DOWNLOAD_SIZE) {
-    throw new Error(`Video file too large (${(videoBuffer.byteLength / 1_073_741_824).toFixed(1)} GB). Maximum allowed is 5 GB.`);
-  }
-
   const s3Client = new S3Client({
     region: s3Region,
-    credentials: {
-      accessKeyId: awsAccessKey,
-      secretAccessKey: awsSecretKey,
-    },
+    credentials: { accessKeyId: awsAccessKey, secretAccessKey: awsSecretKey },
   });
 
-  // Use presigned URL with the buffered body so Content-Length is sent correctly
-  const presignedUrl = await getSignedUrl(s3Client, new PutObjectCommand({
+  // Use streaming multipart upload to avoid buffering entire file in memory
+  const PART_SIZE = 10 * 1024 * 1024; // 10 MB per part
+  console.log(`[analyze-video] Starting multipart upload to ${s3Uri}`);
+
+  const createResp = await s3Client.send(new CreateMultipartUploadCommand({
     Bucket: s3Bucket,
     Key: s3Key,
     ContentType: contentType,
-  }), { expiresIn: 3600 });
+  }));
+  const uploadId = createResp.UploadId!;
 
-  console.log(`[analyze-video] Generated presigned URL, uploading ${(videoBuffer.byteLength / 1_048_576).toFixed(1)} MB...`);
+  const parts: { ETag: string; PartNumber: number }[] = [];
+  let partNumber = 1;
+  let buffer = new Uint8Array(0);
+  let totalUploaded = 0;
 
-  const uploadResp = await fetch(presignedUrl, {
-    method: "PUT",
-    body: videoBuffer,
-    headers: {
-      "Content-Type": contentType,
-      "Content-Length": String(videoBuffer.byteLength),
-    },
-  });
+  const reader = dlResp.body.getReader();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
 
-  if (!uploadResp.ok) {
-    const errText = await uploadResp.text();
-    throw new Error(`S3 presigned upload failed (${uploadResp.status}): ${errText.slice(0, 500)}`);
+      if (value) {
+        // Append to buffer
+        const newBuf = new Uint8Array(buffer.length + value.length);
+        newBuf.set(buffer);
+        newBuf.set(value, buffer.length);
+        buffer = newBuf;
+      }
+
+      // Upload parts when buffer reaches PART_SIZE or stream ends
+      while (buffer.length >= PART_SIZE || (done && buffer.length > 0)) {
+        const chunk = buffer.length >= PART_SIZE ? buffer.slice(0, PART_SIZE) : buffer;
+        buffer = buffer.length >= PART_SIZE ? buffer.slice(PART_SIZE) : new Uint8Array(0);
+
+        const uploadPartResp = await s3Client.send(new UploadPartCommand({
+          Bucket: s3Bucket,
+          Key: s3Key,
+          UploadId: uploadId,
+          PartNumber: partNumber,
+          Body: chunk,
+        }));
+
+        parts.push({ ETag: uploadPartResp.ETag!, PartNumber: partNumber });
+        totalUploaded += chunk.length;
+        console.log(`[analyze-video] Uploaded part ${partNumber} (${(chunk.length / 1_048_576).toFixed(1)} MB, total ${(totalUploaded / 1_048_576).toFixed(1)} MB)`);
+        partNumber++;
+
+        if (done && buffer.length === 0) break;
+      }
+
+      if (done) break;
+    }
+
+    // Complete multipart upload
+    await s3Client.send(new CompleteMultipartUploadCommand({
+      Bucket: s3Bucket,
+      Key: s3Key,
+      UploadId: uploadId,
+      MultipartUpload: { Parts: parts },
+    }));
+
+    console.log(`[analyze-video] Multipart upload complete: ${s3Uri} (${(totalUploaded / 1_048_576).toFixed(1)} MB in ${parts.length} parts)`);
+  } catch (uploadErr: any) {
+    // Abort the multipart upload on failure to avoid orphaned parts
+    console.error(`[analyze-video] Multipart upload failed, aborting: ${uploadErr.message}`);
+    await s3Client.send(new AbortMultipartUploadCommand({
+      Bucket: s3Bucket, Key: s3Key, UploadId: uploadId,
+    })).catch(() => {});
+    throw uploadErr;
   }
-
-  console.log(`[analyze-video] Uploaded to S3 via presigned URL: ${s3Uri}`);
 
   // Update the video record with the new S3 URI
   const { error: updateErr } = await supabase
