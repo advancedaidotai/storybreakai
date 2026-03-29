@@ -1223,13 +1223,13 @@ const Results = () => {
     const title = projectInfo.title || "StoryBreak Export";
     const dur = projectInfo.duration_sec || 0;
     switch (fmt) {
-      case "edl": downloadFile(generateEDL(breakpoints, title), `${safeTitle}-breakpoints.edl`); break;
-      case "fcpxml": downloadFile(generateFCPXML(breakpoints, segments, title, dur), `${safeTitle}-breakpoints.fcpxml`, "application/xml"); break;
-      case "premiere": downloadFile(generatePremiereXML(breakpoints, segments, title, dur), `${safeTitle}-breakpoints-premiere.xml`, "application/xml"); break;
-      case "ott": downloadFile(JSON.stringify(generateOTTManifest(breakpoints, projectId || "", projectInfo), null, 2), `${safeTitle}-ott-manifest.json`, "application/json"); break;
+      case "edl": downloadFile(generateEDL(exportBreakpoints, title), `${safeTitle}-breakpoints.edl`); break;
+      case "fcpxml": downloadFile(generateFCPXML(exportBreakpoints, segments, title, dur), `${safeTitle}-breakpoints.fcpxml`, "application/xml"); break;
+      case "premiere": downloadFile(generatePremiereXML(exportBreakpoints, segments, title, dur), `${safeTitle}-breakpoints-premiere.xml`, "application/xml"); break;
+      case "ott": downloadFile(JSON.stringify(generateOTTManifest(exportBreakpoints, projectId || "", projectInfo), null, 2), `${safeTitle}-ott-manifest.json`, "application/json"); break;
     }
-    toast({ title: `${fmt.toUpperCase()} exported`, description: `${fmt.toUpperCase()} file downloaded.` });
-  }, [breakpoints, segments, projectInfo, projectId, downloadFile]);
+    toast({ title: `${fmt.toUpperCase()} exported`, description: `${exportApprovedOnly ? "Approved" : "All"} breakpoints exported.` });
+  }, [exportBreakpoints, segments, projectInfo, projectId, downloadFile, exportApprovedOnly]);
 
   // Compute readiness states from loaded data
   const readiness = useMemo<ReadinessInfo>(() => {
