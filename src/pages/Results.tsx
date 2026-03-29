@@ -653,7 +653,7 @@ function BreakpointStoryboard({ breakpoints, selected, currentTime, onCardClick 
                 </div>
                 <div className="min-w-0">
                   <span className="text-xs font-semibold text-foreground block">{valley.label}</span>
-                  <span className="text-[10px] text-muted-foreground">Narrative Valley</span>
+                  <span className="text-[10px] text-muted-foreground">Natural pause for ad placement</span>
                 </div>
               </div>
 
