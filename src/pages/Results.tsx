@@ -1168,11 +1168,32 @@ const Results = () => {
     }
   }, []);
 
+  // Filter breakpoints for export if approved-only is checked
+  const exportBreakpoints = useMemo(() => {
+    if (!exportApprovedOnly) return breakpoints;
+    return breakpoints.filter((b) => b.approval_status === "approved");
+  }, [breakpoints, exportApprovedOnly]);
+
   const handleExportJSON = useCallback(() => {
-    const data = { segments, breakpoints, highlights };
+    const data = {
+      project_id: projectId,
+      title: projectInfo.title,
+      content_type: projectInfo.content_type,
+      delivery_target: projectInfo.delivery_target,
+      duration_sec: projectInfo.duration_sec,
+      generated_at: new Date().toISOString(),
+      export_filter: exportApprovedOnly ? "approved_only" : "all",
+      segments,
+      breakpoints: exportBreakpoints.map((bp) => ({
+        ...bp,
+        approval_status: bp.approval_status || "pending",
+        boundary_reasons: bp.boundary_reasons || [],
+      })),
+      highlights,
+    };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `storybreak-${projectId}.json`; a.click(); URL.revokeObjectURL(url);
-  }, [segments, breakpoints, highlights, projectId]);
+  }, [segments, exportBreakpoints, highlights, projectId, projectInfo, exportApprovedOnly]);
 
   
 
