@@ -97,7 +97,7 @@ async function falSubmit(endpoint: string, input: object, apiKey: string): Promi
 async function falPollResult(endpoint: string, requestId: string, apiKey: string, deadlineMs: number): Promise<any> {
   const statusUrl = `${FAL_BASE}/${endpoint}/requests/${requestId}/status`;
   const resultUrl = `${FAL_BASE}/${endpoint}/requests/${requestId}`;
-
+  let attempt = 0;
   while (Date.now() < deadlineMs) {
     const statusResp = await fetchWithRetry(statusUrl, {
       headers: { Authorization: `Key ${apiKey}` },
@@ -128,7 +128,9 @@ async function falPollResult(endpoint: string, requestId: string, apiKey: string
       throw new Error(`fal.ai job failed: ${JSON.stringify(status.error || status)}`);
     }
 
-    await new Promise((r) => setTimeout(r, 3000));
+    const delay = Math.min(2000 * Math.pow(1.5, attempt), 15000);
+    await new Promise((r) => setTimeout(r, delay));
+    attempt++;
   }
 
   throw new Error("Reel generation timed out");

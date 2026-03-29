@@ -563,6 +563,7 @@ const Index = () => {
                 This helps us optimize scene breaks and chapter markers for your platform.
               </p>
               <select
+                aria-label="Delivery Target"
                 value={deliveryTarget}
                 onChange={(e) => setDeliveryTarget(e.target.value)}
                 disabled={isBusy}
