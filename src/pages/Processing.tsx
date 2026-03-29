@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Check, Loader2, AlertCircle, RefreshCw, CloudUpload, Brain, Layers, Sparkles } from "lucide-react";
+import { Check, Loader2, AlertCircle, RefreshCw, CloudUpload, Brain, Layers, Sparkles, Film } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
@@ -34,6 +34,13 @@ interface ChunkProgress {
   currentChunk?: { index: number; start_sec: number; end_sec: number };
 }
 
+interface ProjectMeta {
+  title: string;
+  content_metadata: any;
+  content_type: string | null;
+  duration_sec: number | null;
+}
+
 function formatTimeRange(startSec: number, endSec: number) {
   const fmt = (s: number) => {
     const m = Math.floor(s / 60);
@@ -45,6 +52,13 @@ function formatTimeRange(startSec: number, endSec: number) {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+const ENCOURAGING = [
+  "Hang tight, almost there…",
+  "Our AI is deep in concentration…",
+  "Great content takes a moment to decode…",
+  "Piecing together the narrative…",
+];
+
 const Processing = () => {
   const navigate = useNavigate();
   const { projectId: rawId } = useParams<{ projectId: string }>();
@@ -54,11 +68,27 @@ const Processing = () => {
   const [retrying, setRetrying] = useState(false);
   const [chunkProgress, setChunkProgress] = useState<ChunkProgress | null>(null);
   const triggeredAnalyze = useRef(false);
-  
+  const [projectMeta, setProjectMeta] = useState<ProjectMeta | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [scenesFound, setScenesFound] = useState(0);
+  const [thumbTimestamps, setThumbTimestamps] = useState<number[]>([]);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
-  // Poll project status + chunk progress
+  // Poll project status + chunk progress + metadata
   useEffect(() => {
     if (!projectId) return;
+
+    // Fetch project metadata once
+    supabase.from("projects").select("title, content_metadata, content_type, duration_sec").eq("id", projectId).single()
+      .then(({ data }) => { if (data) setProjectMeta(data as ProjectMeta); });
+
+    // Fetch video URL
+    supabase.from("videos").select("s3_uri, original_filename").eq("project_id", projectId).limit(1).single()
+      .then(({ data }) => {
+        if (data?.s3_uri && !data.s3_uri.startsWith("s3://")) {
+          setVideoUrl(data.s3_uri);
+        }
+      });
 
     const poll = async () => {
       const { data, error: fetchErr } = await supabase.from("projects").select("status").eq("id", projectId).single();
@@ -91,6 +121,13 @@ const Processing = () => {
           });
         }
       }
+
+      // Count segments found so far
+      const { count } = await supabase
+        .from("segments")
+        .select("id", { count: "exact", head: true })
+        .eq("project_id", projectId);
+      if (count !== null) setScenesFound(count);
     };
 
     poll();
@@ -133,6 +170,23 @@ const Processing = () => {
     }
   }, [projectId, status, navigate]);
 
+  // Generate thumbnail timestamps periodically from video
+  useEffect(() => {
+    if (!videoUrl || !projectMeta?.duration_sec) return;
+    const dur = projectMeta.duration_sec;
+    const addThumb = () => {
+      setThumbTimestamps((prev) => {
+        if (prev.length >= 6) return prev;
+        const t = Math.floor(Math.random() * dur);
+        if (prev.includes(t)) return prev;
+        return [...prev, t].sort((a, b) => a - b);
+      });
+    };
+    addThumb();
+    const iv = setInterval(addThumb, 5000);
+    return () => clearInterval(iv);
+  }, [videoUrl, projectMeta?.duration_sec]);
+
   const handleRetry = useCallback(async () => {
     if (!projectId) return;
     setRetrying(true);
@@ -147,12 +201,18 @@ const Processing = () => {
 
   const activeStep = statusToStepIndex(status);
   const isFailed = status === "failed";
+  const overallPct = Math.min(100, Math.max(0, ((activeStep + 1) / STEPS.length) * 100));
+  const encourageMsg = ENCOURAGING[activeStep >= 0 ? activeStep % ENCOURAGING.length : 0];
+
+  const meta = projectMeta?.content_metadata || {};
+  const displayTitle = meta.title || projectMeta?.title || "Your Video";
+  const displayNetwork = meta.network || null;
 
   if (!projectId) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-6">
         <AlertCircle className="h-10 w-10 text-muted-foreground/30 mb-4" />
-        <h1 className="text-xl font-bold text-foreground mb-2">Hmm, nothing here yet</h1>
+        <h1 className="text-xl font-bold text-foreground mb-2">No Active Analysis Found</h1>
         <p className="text-sm text-muted-foreground mb-6">We couldn't find an active analysis at this URL. Let's start fresh!</p>
         <Button className="rounded-xl glow-blue" onClick={() => navigate("/")}>Start New Analysis</Button>
       </div>
@@ -160,12 +220,37 @@ const Processing = () => {
   }
 
   return (
-    <div className="flex flex-col items-center px-6 py-20 max-w-xl mx-auto animate-fade-in">
+    <div className="flex flex-col items-center px-6 py-12 max-w-2xl mx-auto animate-fade-in">
+      {/* Overall progress bar */}
+      <div className="w-full mb-8">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-medium text-muted-foreground">Overall Progress</p>
+          <p className="text-xs font-mono text-primary">{isFailed ? "—" : `${Math.round(overallPct)}%`}</p>
+        </div>
+        <Progress value={isFailed ? 0 : overallPct} className="h-2" />
+      </div>
+
+      {/* Project metadata header */}
+      <div className="w-full glass-panel rounded-2xl px-5 py-4 mb-8 flex items-center gap-4">
+        <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+          <Film className="h-5 w-5 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h2 className="text-base font-bold text-foreground truncate">{displayTitle}</h2>
+          <div className="flex items-center gap-2 mt-0.5">
+            {displayNetwork && <span className="text-[10px] text-muted-foreground bg-surface-2/80 px-2 py-0.5 rounded">{displayNetwork}</span>}
+            {projectMeta?.content_type && (
+              <span className="text-[10px] text-muted-foreground/60 capitalize">{projectMeta.content_type.replace("_", " ")}</span>
+            )}
+          </div>
+        </div>
+      </div>
+
       <h1 className="text-2xl font-bold tracking-tight text-foreground">Working some magic ✨</h1>
       <p className="text-muted-foreground mt-2 text-center text-sm">Our AI is watching your video and mapping every scene, arc, and highlight. This usually takes a few minutes.</p>
 
       {/* Stepper */}
-      <div className="mt-14 w-full max-w-sm space-y-0">
+      <div className="mt-10 w-full max-w-sm space-y-0">
         {STEPS.map((step, i) => {
           const Icon = step.icon;
           const isDone = activeStep > i;
@@ -197,7 +282,7 @@ const Processing = () => {
                 }`}>{step.label}</p>
 
                 {isActive && !isError && (
-                  <p className="text-xs text-primary/70 mt-0.5 font-medium tracking-wide">Hang tight, almost there…</p>
+                  <p className="text-xs text-primary/70 mt-0.5 font-medium tracking-wide">{encourageMsg}</p>
                 )}
                 {isDone && <p className="text-xs text-segment/70 mt-0.5">Done ✓</p>}
 
@@ -227,9 +312,53 @@ const Processing = () => {
         })}
       </div>
 
+      {/* Live Preview — video thumbnails */}
+      {videoUrl && thumbTimestamps.length > 0 && (
+        <div className="w-full mt-4 glass-panel rounded-2xl p-4 fade-in-600">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs font-semibold text-foreground/80">Live Preview</p>
+            {scenesFound > 0 && (
+              <p className="text-xs text-primary font-medium animate-pulse">
+                Discovered {scenesFound} scene{scenesFound !== 1 ? "s" : ""} so far…
+              </p>
+            )}
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {thumbTimestamps.map((t) => (
+              <div key={t} className="relative aspect-video rounded-lg overflow-hidden bg-surface-0 border border-border/10">
+                <video
+                  ref={videoRef}
+                  src={`${videoUrl}#t=${t}`}
+                  className="w-full h-full object-cover"
+                  muted
+                  preload="metadata"
+                  onError={(e) => {
+                    (e.target as HTMLVideoElement).style.display = "none";
+                  }}
+                />
+                <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent px-1.5 py-1">
+                  <span className="text-[9px] font-mono text-white/80">
+                    {Math.floor(t / 60)}:{(t % 60).toString().padStart(2, "0")}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Scene count when no video preview available */}
+      {!videoUrl && scenesFound > 0 && (
+        <div className="w-full mt-4 glass-panel rounded-2xl p-4 text-center fade-in-600">
+          <p className="text-sm text-primary font-medium animate-pulse">
+            Discovered {scenesFound} scene{scenesFound !== 1 ? "s" : ""} so far…
+          </p>
+        </div>
+      )}
+
       {/* Error state */}
       {isFailed && (
-        <div className="w-full max-w-sm glass-panel rounded-2xl p-5 border-l-2 border-l-destructive mt-2 animate-fade-in">
+        <div className="w-full max-w-sm glass-panel rounded-2xl p-5 border-l-2 border-l-destructive mt-6 animate-fade-in">
           <div className="flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
             <div className="flex-1">
@@ -246,7 +375,7 @@ const Processing = () => {
         </div>
       )}
 
-      <div className="flex items-center justify-center w-full max-w-sm mt-12">
+      <div className="flex items-center justify-center w-full max-w-sm mt-8">
         <Button variant="ghost" size="sm" className="text-xs h-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => navigate("/")}>← Start Over</Button>
       </div>
     </div>
