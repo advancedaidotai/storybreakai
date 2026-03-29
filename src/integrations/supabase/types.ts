@@ -222,7 +222,14 @@ export type Database = {
     }
     Enums: {
       export_type: "json" | "reel"
-      project_status: "draft" | "uploaded" | "analyzing" | "ready" | "failed"
+      project_status:
+        | "draft"
+        | "uploaded"
+        | "analyzing"
+        | "ready"
+        | "failed"
+        | "generating_reel"
+        | "complete"
       segment_type:
         | "opening"
         | "climax"
@@ -357,7 +364,15 @@ export const Constants = {
   public: {
     Enums: {
       export_type: ["json", "reel"],
-      project_status: ["draft", "uploaded", "analyzing", "ready", "failed"],
+      project_status: [
+        "draft",
+        "uploaded",
+        "analyzing",
+        "ready",
+        "failed",
+        "generating_reel",
+        "complete",
+      ],
       segment_type: [
         "opening",
         "climax",
