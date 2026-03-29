@@ -881,9 +881,9 @@ const Index = () => {
                   <><Sparkles className="h-4 w-4 mr-2" /> Start Analysis</>
                 )}
               </Button>
-              {!formValid && !isBusy && (
+              {(!formValid || codecBlocked) && !isBusy && (
                 <div className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap opacity-0 group-hover/upload:opacity-100 transition-opacity bg-popover border border-border/30 text-[11px] text-muted-foreground px-3 py-1.5 rounded-lg shadow-lg pointer-events-none z-20">
-                  {!hasVideoSource && !titleValid ? "Add a video and enter a title to get started" : !hasVideoSource ? "Add a video to continue" : "Enter a title to continue"}
+                  {codecBlocked ? "This video format is not supported — please select a different file" : !hasVideoSource && !titleValid ? "Add a video and enter a title to get started" : !hasVideoSource ? "Add a video to continue" : "Enter a title to continue"}
                 </div>
               )}
             </div>
