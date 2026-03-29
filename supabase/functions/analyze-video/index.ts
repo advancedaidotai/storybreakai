@@ -267,7 +267,11 @@ All timestamps in seconds. Return ONLY valid JSON with keys: segments, breakpoin
 
 // ─── Bedrock call with response parsing ──────────────────────────────────────
 
-async function callPegasus(prompt: string, projectId: string): Promise<{ result: AnalysisResult; logs: AnalysisLog[] }> {
+async function callPegasus(
+  prompt: string,
+  projectId: string,
+  s3Uri: string,
+): Promise<{ result: AnalysisResult; logs: AnalysisLog[] }> {
   const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY")!;
   const awsSecretKey = Deno.env.get("AWS_SECRET_KEY")!;
   const bedrockRegion = Deno.env.get("BEDROCK_REGION") || "us-east-1";
@@ -288,8 +292,15 @@ async function callPegasus(prompt: string, projectId: string): Promise<{ result:
       accept: "application/json",
       body: new TextEncoder().encode(
         JSON.stringify({
-          inputText: prompt,
-          textGenerationConfig: { maxTokenCount: 8192, temperature: 0.2, topP: 0.9 },
+          inputPrompt: prompt,
+          mediaSource: {
+            s3Location: {
+              uri: s3Uri,
+            },
+          },
+          maxOutputTokens: 4096,
+          temperature: 0.2,
+          topP: 0.9,
         }),
       ),
     });
@@ -304,6 +315,7 @@ async function callPegasus(prompt: string, projectId: string): Promise<{ result:
   let responseText: string;
   if (bedrockData?.results?.[0]?.outputText) responseText = bedrockData.results[0].outputText;
   else if (bedrockData?.output?.text) responseText = bedrockData.output.text;
+  else if (typeof bedrockData?.outputText === "string") responseText = bedrockData.outputText;
   else if (typeof bedrockData?.body === "string") responseText = bedrockData.body;
   else responseText = JSON.stringify(bedrockData);
 
