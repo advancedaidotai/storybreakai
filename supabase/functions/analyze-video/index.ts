@@ -422,15 +422,16 @@ async function ensureS3Uri(
   const s3Key = `uploads/${projectId}/${originalFilename}`;
   const s3Uri = `s3://${s3Bucket}/${s3Key}`;
 
-  console.log(`[analyze-video] Downloading video from URL: ${currentUri.slice(0, 200)}`);
+  console.log(`[analyze-video] Streaming video from URL to S3: ${currentUri.slice(0, 200)}`);
   const dlResp = await fetch(currentUri);
   if (!dlResp.ok) {
     throw new Error(`Failed to download video (${dlResp.status}): ${currentUri.slice(0, 200)}`);
   }
+  if (!dlResp.body) {
+    throw new Error(`No response body from video URL`);
+  }
 
-  const videoBytes = new Uint8Array(await dlResp.arrayBuffer());
   const contentType = dlResp.headers.get("content-type") || "video/mp4";
-  console.log(`[analyze-video] Downloaded ${(videoBytes.byteLength / 1024 / 1024).toFixed(1)} MB, uploading to S3: ${s3Key}`);
 
   const s3Client = new S3Client({
     region: bedrockRegion,
@@ -440,12 +441,26 @@ async function ensureS3Uri(
     },
   });
 
-  await s3Client.send(new PutObjectCommand({
-    Bucket: s3Bucket,
-    Key: s3Key,
-    Body: videoBytes,
-    ContentType: contentType,
-  }));
+  const upload = new Upload({
+    client: s3Client,
+    params: {
+      Bucket: s3Bucket,
+      Key: s3Key,
+      Body: dlResp.body,
+      ContentType: contentType,
+    },
+    queueSize: 4,
+    partSize: 10 * 1024 * 1024, // 10 MB parts
+  });
+
+  upload.on("httpUploadProgress", (progress: any) => {
+    if (progress.loaded) {
+      console.log(`[analyze-video] S3 upload progress: ${(progress.loaded / 1024 / 1024).toFixed(1)} MB`);
+    }
+  });
+
+  await upload.done();
+  console.log(`[analyze-video] Streamed to S3: ${s3Uri}`);
 
   console.log(`[analyze-video] Uploaded to S3: ${s3Uri}`);
 
