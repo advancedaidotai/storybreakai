@@ -153,6 +153,7 @@ const Index = () => {
   const [urlValid, setUrlValid] = useState(false);
   const [urlError, setUrlError] = useState<string | null>(null);
   const [codecWarning, setCodecWarning] = useState<string | null>(null);
+  const [codecBlocked, setCodecBlocked] = useState(false);
 
   const config = CONTENT_CONFIGS[contentType];
 
@@ -384,6 +385,7 @@ const Index = () => {
 
   const checkCodecSupport = useCallback((file: File) => {
     setCodecWarning(null);
+    setCodecBlocked(false);
     const video = document.createElement("video");
     video.preload = "metadata";
     const blobUrl = URL.createObjectURL(file);
@@ -391,18 +393,16 @@ const Index = () => {
     const cleanup = () => { URL.revokeObjectURL(blobUrl); };
 
     video.onloadedmetadata = () => {
-      // If the browser can't decode the codec, dimensions will be 0
       if (video.videoWidth === 0 && video.videoHeight === 0) {
         setCodecWarning(
-          "This video may use an unsupported codec (e.g. HEVC/H.265, VP9, or AV1). Our AI model requires H.264/AVC in an MP4 container. Analysis will likely fail — please re-encode with H.264 if possible."
+          "This video uses an unsupported codec. StoryBreak AI requires H.264 (AVC) video in an MP4 container. Please re-encode your video and try again."
         );
+        setCodecBlocked(true);
         cleanup();
         return;
       }
-      // Additional check: see if the browser reports the MIME as playable
       const mime = file.type || "video/mp4";
       if (typeof MediaSource !== "undefined" && !MediaSource.isTypeSupported(mime)) {
-        // Not all browsers flag this, so only warn — don't block
         const ext = file.name.split(".").pop()?.toLowerCase();
         if (ext !== "mp4" && ext !== "mov") {
           setCodecWarning(
@@ -415,8 +415,9 @@ const Index = () => {
 
     video.onerror = () => {
       setCodecWarning(
-        "We couldn't read this video's codec information. It may use an unsupported format. For reliable analysis, use H.264/AVC in an MP4 container."
+        "We couldn't read this video. The file may be corrupt or use an unsupported format. Please use an H.264/MP4 file."
       );
+      setCodecBlocked(true);
       cleanup();
     };
 
@@ -431,6 +432,7 @@ const Index = () => {
     setFileSize(file.size);
     setError(null);
     setCodecWarning(null);
+    setCodecBlocked(false);
     checkCodecSupport(file);
   }, [checkCodecSupport]);
 
@@ -804,7 +806,7 @@ const Index = () => {
                           <p className="text-xs text-muted-foreground">{formatSize(selectedFile.size)}</p>
                         </div>
                         <button
-                          onClick={(e) => { e.stopPropagation(); setSelectedFile(null); setFileName(""); setFileSize(0); setCodecWarning(null); }}
+                          onClick={(e) => { e.stopPropagation(); setSelectedFile(null); setFileName(""); setFileSize(0); setCodecWarning(null); setCodecBlocked(false); }}
                           className="shrink-0 h-8 w-8 rounded-lg bg-surface-2/60 flex items-center justify-center hover:bg-destructive/20 hover:text-destructive transition-colors"
                         >
                           <X className="h-3.5 w-3.5" />
@@ -837,15 +839,21 @@ const Index = () => {
               )}
             </div>
 
-            {/* Codec warning */}
+            {/* Codec warning / error */}
             {codecWarning && !error && (
-              <div className="flex items-start gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-400">
-                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+              <div className={`flex items-start gap-3 p-3.5 rounded-xl border ${
+                codecBlocked
+                  ? "bg-destructive/10 border-destructive/25 text-destructive"
+                  : "bg-amber-500/10 border-amber-500/25 text-amber-400"
+              }`}>
+                {codecBlocked ? <XCircle className="h-4 w-4 shrink-0 mt-0.5" /> : <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />}
                 <div className="flex-1">
-                  <p className="text-xs font-semibold mb-0.5">Codec Compatibility Warning</p>
+                  <p className="text-xs font-semibold mb-0.5">{codecBlocked ? "Unsupported Video Format" : "Codec Compatibility Warning"}</p>
                   <p className="text-[11px] leading-relaxed opacity-80">{codecWarning}</p>
                 </div>
-                <button onClick={() => setCodecWarning(null)} className="shrink-0 hover:opacity-70 transition-opacity"><X className="h-3.5 w-3.5" /></button>
+                {!codecBlocked && (
+                  <button onClick={() => setCodecWarning(null)} className="shrink-0 hover:opacity-70 transition-opacity"><X className="h-3.5 w-3.5" /></button>
+                )}
               </div>
             )}
 
@@ -863,8 +871,8 @@ const Index = () => {
               <Button
                 size="lg"
                 className="w-full rounded-xl h-12 text-sm font-semibold btn-hover disabled:opacity-40 disabled:shadow-none"
-                style={{ background: formValid && !isBusy ? "linear-gradient(135deg, hsl(187 92% 42%), hsl(217 91% 55%))" : undefined }}
-                disabled={!formValid || isBusy}
+                style={{ background: formValid && !isBusy && !codecBlocked ? "linear-gradient(135deg, hsl(187 92% 42%), hsl(217 91% 55%))" : undefined }}
+                disabled={!formValid || isBusy || codecBlocked}
                 onClick={() => { setTouched(true); if (formValid) handleUpload(); }}
               >
                 {isBusy ? (
@@ -873,9 +881,9 @@ const Index = () => {
                   <><Sparkles className="h-4 w-4 mr-2" /> Start Analysis</>
                 )}
               </Button>
-              {!formValid && !isBusy && (
+              {(!formValid || codecBlocked) && !isBusy && (
                 <div className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap opacity-0 group-hover/upload:opacity-100 transition-opacity bg-popover border border-border/30 text-[11px] text-muted-foreground px-3 py-1.5 rounded-lg shadow-lg pointer-events-none z-20">
-                  {!hasVideoSource && !titleValid ? "Add a video and enter a title to get started" : !hasVideoSource ? "Add a video to continue" : "Enter a title to continue"}
+                  {codecBlocked ? "This video format is not supported — please select a different file" : !hasVideoSource && !titleValid ? "Add a video and enter a title to get started" : !hasVideoSource ? "Add a video to continue" : "Enter a title to continue"}
                 </div>
               )}
             </div>
