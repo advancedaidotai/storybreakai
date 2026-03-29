@@ -750,7 +750,7 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, readines
 
       {/* Readiness States */}
       <div className="border-t border-border/20 pt-4">
-        <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">Pipeline Status</h3>
+        <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">How Things Look</h3>
         <div className="space-y-2">
           {([
             { key: "analysis" as const, label: "AI Analysis" },
