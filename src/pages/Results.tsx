@@ -800,7 +800,6 @@ const Results = () => {
           supabase.from("breakpoints").select("*").eq("project_id", projectId).order("timestamp_sec"),
           supabase.from("highlights").select("*").eq("project_id", projectId).order("score", { ascending: false }),
           supabase.from("analysis_chunks").select("id, chunk_index, start_sec, end_sec, overlap_start_sec, overlap_end_sec").eq("project_id", projectId).order("chunk_index"),
-          supabase.from("analysis_chunks").select("id, chunk_index, start_sec, end_sec, overlap_start_sec, overlap_end_sec").eq("project_id", projectId).order("chunk_index"),
         ]);
 
         if (projRes.error) {
