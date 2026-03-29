@@ -136,22 +136,34 @@ export type Database = {
       }
       projects: {
         Row: {
+          content_metadata: Json | null
+          content_type: Database["public"]["Enums"]["content_type"] | null
           created_at: string
           delivery_target: string | null
+          duration_sec: number | null
+          file_size_bytes: number | null
           id: string
           status: Database["public"]["Enums"]["project_status"]
           title: string
         }
         Insert: {
+          content_metadata?: Json | null
+          content_type?: Database["public"]["Enums"]["content_type"] | null
           created_at?: string
           delivery_target?: string | null
+          duration_sec?: number | null
+          file_size_bytes?: number | null
           id?: string
           status?: Database["public"]["Enums"]["project_status"]
           title: string
         }
         Update: {
+          content_metadata?: Json | null
+          content_type?: Database["public"]["Enums"]["content_type"] | null
           created_at?: string
           delivery_target?: string | null
+          duration_sec?: number | null
+          file_size_bytes?: number | null
           id?: string
           status?: Database["public"]["Enums"]["project_status"]
           title?: string
@@ -236,6 +248,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      content_type: "short_form" | "tv_episode" | "feature_film"
       export_type: "json" | "reel"
       project_status:
         | "draft"
@@ -380,6 +393,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      content_type: ["short_form", "tv_episode", "feature_film"],
       export_type: ["json", "reel"],
       project_status: [
         "draft",
