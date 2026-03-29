@@ -48,7 +48,7 @@ const CONTENT_TYPE_PROMPTS: Record<string, string> = {
 const SEGMENT_TYPES = ["opening", "climax", "story_unit", "transition", "resolution"];
 const VALLEY_TYPES = ["dialogue_pause", "topic_shift", "emotional_resolution", "scene_transition"];
 
-const CHUNK_DURATION = 45 * 60; // 45 min chunks
+const CHUNK_DURATION = 7200; // 2 hours — raised for demo safety to avoid multi-pass bugs
 const OVERLAP_DURATION = 5 * 60; // 5 min overlap
 const MAX_SINGLE_PASS = 3600; // 60 min
 
