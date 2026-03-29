@@ -451,7 +451,7 @@ function Timeline({
             return (
               <TimelineTooltip key={seg.id} content={
                 <div className="text-[10px]">
-                  <p className="font-semibold text-foreground capitalize">{seg.type.replace("_", " ")}</p>
+                  <p className="font-semibold text-foreground capitalize">{seg.type === "story_unit" ? "Narrative Beat" : seg.type === "transition" ? "Story Transition" : seg.type === "climax" ? "Dramatic Peak" : seg.type === "resolution" ? "Resolution Arc" : seg.type === "opening" ? "Opening Sequence" : seg.type.replace("_", " ")}</p>
                   <p className="text-muted-foreground font-mono">{formatTime(seg.start_sec)} → {formatTime(seg.end_sec)}</p>
                   {seg.summary && <p className="text-muted-foreground mt-1 line-clamp-2">{seg.summary}</p>}
                 </div>
