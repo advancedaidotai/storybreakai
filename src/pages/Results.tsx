@@ -2,7 +2,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
 import {
-  Play, Sparkles, Star, Download, FileJson, Zap, Loader2,
+  Play, Sparkles, Star, FileJson, Zap, Loader2,
   MessageCircle, ArrowRightLeft, Heart, Film, Package,
   Clock, Shield, Timer, Minus, Plus, ChevronLeft, ChevronRight,
   List, Diamond, MonitorPlay, Clapperboard, AlertCircle,
@@ -680,8 +680,8 @@ function BreakpointStoryboard({ breakpoints, selected, currentTime, onCardClick 
 
 // ─── Detail Panel ────────────────────────────────────────────────────────────
 
-function DetailPanel({ selected, onExportJSON, onDownloadReel, onDownloadMasterPackage, reelUrl }: {
-  selected: SelectedItem | null; onExportJSON: () => void; onDownloadReel: () => void; onDownloadMasterPackage: () => void; reelUrl: string | null;
+function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage }: {
+  selected: SelectedItem | null; onExportJSON: () => void; onDownloadMasterPackage: () => void;
 }) {
   return (
     <div className="glass-panel rounded-2xl p-4 flex flex-col gap-4 h-fit lg:sticky lg:top-16 overflow-auto">
@@ -708,7 +708,6 @@ function DetailPanel({ selected, onExportJSON, onDownloadReel, onDownloadMasterP
         <div className="flex flex-col gap-2">
           <Button variant="outline" size="sm" className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover" onClick={onExportJSON}><FileJson className="h-3.5 w-3.5" /> Export JSON</Button>
           <Button variant="outline" size="sm" className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover" onClick={onDownloadMasterPackage}><Package className="h-3.5 w-3.5" /> Download Master Package</Button>
-          <Button size="sm" className="w-full gap-2 rounded-xl text-xs h-8 glow-blue btn-hover" onClick={onDownloadReel} disabled={!reelUrl}><Download className="h-3.5 w-3.5" /> Download Reel</Button>
         </div>
       </div>
     </div>
@@ -770,7 +769,7 @@ const Results = () => {
   const [breakpoints, setBreakpoints] = useState<Breakpoint[]>([]);
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
-  const [reelUrl, setReelUrl] = useState<string | null>(null);
+  
   const [totalDuration, setTotalDuration] = useState(0);
   const [selected, setSelected] = useState<SelectedItem | null>(null);
   const [projectInfo, setProjectInfo] = useState<ProjectInfo>({ title: "", content_type: null, content_metadata: null, delivery_target: null, duration_sec: null });
@@ -794,13 +793,12 @@ const Results = () => {
       setLoading(true);
       setFetchError(null);
       try {
-        const [projRes, vidRes, segRes, bpRes, hlRes, expRes, chunkRes] = await Promise.all([
+        const [projRes, vidRes, segRes, bpRes, hlRes, chunkRes] = await Promise.all([
           supabase.from("projects").select("title, content_type, content_metadata, delivery_target, duration_sec").eq("id", projectId).single(),
           supabase.from("videos").select("s3_uri, duration_sec").eq("project_id", projectId).single(),
           supabase.from("segments").select("*").eq("project_id", projectId).order("start_sec"),
           supabase.from("breakpoints").select("*").eq("project_id", projectId).order("timestamp_sec"),
           supabase.from("highlights").select("*").eq("project_id", projectId).order("score", { ascending: false }),
-          supabase.from("exports").select("file_url").eq("project_id", projectId).eq("type", "reel").order("created_at", { ascending: false }).limit(1),
           supabase.from("analysis_chunks").select("id, chunk_index, start_sec, end_sec, overlap_start_sec, overlap_end_sec").eq("project_id", projectId).order("chunk_index"),
         ]);
 
@@ -816,7 +814,6 @@ const Results = () => {
         if (segRes.data) setSegments(segRes.data as Segment[]);
         if (bpRes.data) setBreakpoints(bpRes.data as Breakpoint[]);
         if (hlRes.data) setHighlights(hlRes.data as Highlight[]);
-        if (expRes.data?.[0]?.file_url) setReelUrl(expRes.data[0].file_url);
         if (chunkRes.data) setChunks(chunkRes.data as AnalysisChunk[]);
 
         // Warn if no analysis data found
@@ -852,7 +849,7 @@ const Results = () => {
     const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `storybreak-${projectId}.json`; a.click(); URL.revokeObjectURL(url);
   }, [segments, breakpoints, highlights, projectId]);
 
-  const handleDownloadReel = useCallback(() => { if (reelUrl) window.open(reelUrl, "_blank"); }, [reelUrl]);
+  
 
   const handleDownloadMasterPackage = useCallback(() => {
     const safeTitle = (projectInfo.title || "StoryBreak-Export").replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -923,17 +920,18 @@ const Results = () => {
           </div>
         </div>
 
-        {/* Highlight Reel */}
-        <div className="glass-panel rounded-2xl overflow-hidden glow-blue cinematic-shadow fade-in-600 fade-in-delay-2">
-          <div className="relative">
-            {reelUrl ? <video src={reelUrl} className="w-full aspect-video bg-primary/[0.02] object-contain" controls preload="metadata" /> : <div className="aspect-video bg-primary/[0.02] flex items-center justify-center"><Sparkles className="h-6 w-6 text-primary/40" /></div>}
-            <Badge className="absolute top-2 left-2 text-[10px] bg-accent/90 text-accent-foreground border-0 pointer-events-none">AI Highlight Reel</Badge>
+        {/* Analysis Summary Panel */}
+        <div className="glass-panel rounded-2xl overflow-hidden cinematic-shadow fade-in-600 fade-in-delay-2">
+          <div className="aspect-video bg-primary/[0.02] flex flex-col items-center justify-center gap-3 p-6">
+            <Sparkles className="h-8 w-8 text-primary/40" />
+            <p className="text-sm font-semibold text-foreground">Analysis Complete</p>
+            <p className="text-xs text-muted-foreground text-center">{segments.length} segments · {breakpoints.length} breakpoints · {highlights.length} highlights detected</p>
           </div>
         </div>
 
         {/* Detail Panel + Scene Index */}
         <div className="fade-in-600 fade-in-delay-3 space-y-4">
-          <DetailPanel selected={selected} onExportJSON={handleExportJSON} onDownloadReel={handleDownloadReel} onDownloadMasterPackage={handleDownloadMasterPackage} reelUrl={reelUrl} />
+          <DetailPanel selected={selected} onExportJSON={handleExportJSON} onDownloadMasterPackage={handleDownloadMasterPackage} />
           <SceneIndex segments={segments} contentType={projectInfo.content_type} duration={duration} onSelect={handleSelectSegment} />
         </div>
       </div>

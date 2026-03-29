@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Check, Loader2, AlertCircle, RefreshCw, CloudUpload, Brain, Layers, Sparkles, Film } from "lucide-react";
+import { Check, Loader2, AlertCircle, RefreshCw, CloudUpload, Brain, Layers, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,7 +12,6 @@ const STEPS = [
   { key: "analyzing", label: "Analyzing with AI", icon: Brain },
   { key: "segments_done", label: "Detecting Segments", icon: Layers },
   { key: "highlights_done", label: "Identifying Highlights", icon: Sparkles },
-  { key: "generating_reel", label: "Generating Highlight Reel", icon: Film },
 ] as const;
 
 function statusToStepIndex(status: ProjectStatus): number {
@@ -21,9 +20,8 @@ function statusToStepIndex(status: ProjectStatus): number {
     case "uploaded": return 0;
     case "analyzing": return 1;
     case "segments_done": return 2;
-    case "highlights_done": return 3;
-    case "generating_reel": return 4;
-    case "ready": case "complete": return 5;
+    case "highlights_done": return 4;
+    case "generating_reel": case "ready": case "complete": return 5;
     case "failed": return -2;
     default: return -1;
   }
@@ -56,7 +54,7 @@ const Processing = () => {
   const [retrying, setRetrying] = useState(false);
   const [chunkProgress, setChunkProgress] = useState<ChunkProgress | null>(null);
   const triggeredAnalyze = useRef(false);
-  const triggeredReel = useRef(false);
+  
 
   // Poll project status + chunk progress
   useEffect(() => {
@@ -126,33 +124,14 @@ const Processing = () => {
       });
   }, [projectId, status]);
 
-  // Auto-trigger generate-reel
+  // Skip reel generation — navigate to results once highlights are done
   useEffect(() => {
-    if (!projectId || triggeredReel.current) return;
-    if (status === "ready" || status === "highlights_done") {
-      triggeredReel.current = true;
-      console.log("[Processing] Triggering generate-reel for", projectId);
-      supabase.functions.invoke("generate-reel", { body: { project_id: projectId } })
-        .then(({ data, error: fnErr }) => {
-          if (fnErr) {
-            console.error("[Processing] generate-reel invoke error:", fnErr.message);
-            setError(`Reel generation failed: ${fnErr.message}`);
-            setStatus("failed");
-          } else if (data?.error) {
-            console.error("[Processing] generate-reel returned error:", data.error);
-            setError(`Reel error: ${data.error}`);
-            setStatus("failed");
-          } else {
-            console.log("[Processing] generate-reel invoked successfully");
-          }
-        })
-        .catch((err: any) => {
-          console.error("[Processing] generate-reel unexpected error:", err);
-          setError("Failed to connect to reel service. Please retry.");
-          setStatus("failed");
-        });
+    if (!projectId) return;
+    if (status === "highlights_done" || status === "ready") {
+      console.log("[Processing] Analysis complete — navigating to results");
+      navigate(`/results/${projectId}`, { replace: true });
     }
-  }, [projectId, status]);
+  }, [projectId, status, navigate]);
 
   const handleRetry = useCallback(async () => {
     if (!projectId) return;
@@ -160,7 +139,7 @@ const Processing = () => {
     setError(null);
     setChunkProgress(null);
     triggeredAnalyze.current = false;
-    triggeredReel.current = false;
+    
     await supabase.from("projects").update({ status: "uploaded" as any }).eq("id", projectId);
     setStatus("uploaded");
     setRetrying(false);
