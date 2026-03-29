@@ -908,6 +908,7 @@ const Results = () => {
   const navigate = useNavigate();
   const { projectId } = useParams<{ projectId: string }>();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const previewVideoRef = useRef<HTMLVideoElement>(null);
 
   const [loading, setLoading] = useState(true);
   const [segments, setSegments] = useState<Segment[]>([]);
