@@ -167,20 +167,44 @@ Deno.serve(async (req) => {
     const awsSecretKey = Deno.env.get("AWS_SECRET_KEY");
     const awsRegion = Deno.env.get("BEDROCK_REGION") || "us-east-1";
 
-    // 1) Fetch top 5 highlights by score, then re-order chronologically
+    // 1) Fetch top 8 highlights by score for a punchy 30-60s reel
+    const MAX_HIGHLIGHTS = 8;
+    const MAX_CLIP_DURATION_SEC = 8;
+    const MAX_REEL_DURATION_SEC = 60;
+
     const { data: highlights, error: hlErr } = await supabase
       .from("highlights")
       .select("id, start_sec, end_sec, score, rank_order")
       .eq("project_id", projectId)
       .order("score", { ascending: false })
-      .limit(5);
+      .limit(MAX_HIGHLIGHTS);
 
     if (hlErr || !highlights || highlights.length === 0) {
       throw new Error("No highlights found for project");
     }
 
+    // Cap individual clip duration to MAX_CLIP_DURATION_SEC and enforce total reel budget
+    let totalBudget = MAX_REEL_DURATION_SEC;
+    for (const hl of highlights) {
+      const clipDur = Number(hl.end_sec) - Number(hl.start_sec);
+      if (clipDur > MAX_CLIP_DURATION_SEC) {
+        hl.end_sec = Number(hl.start_sec) + MAX_CLIP_DURATION_SEC;
+      }
+    }
+
     // Re-order chronologically for natural viewing flow
     highlights.sort((a: any, b: any) => Number(a.start_sec) - Number(b.start_sec));
+
+    // Trim highlight list to fit within total reel duration budget
+    const selectedHighlights: typeof highlights = [];
+    let runningDuration = 0;
+    for (const hl of highlights) {
+      const clipDur = Number(hl.end_sec) - Number(hl.start_sec);
+      if (runningDuration + clipDur > MAX_REEL_DURATION_SEC && selectedHighlights.length > 0) break;
+      selectedHighlights.push(hl);
+      runningDuration += clipDur;
+    }
+    console.log(`[generate-reel] Selected ${selectedHighlights.length}/${highlights.length} clips, total ~${Math.round(runningDuration)}s`);
 
     // Fetch video S3 URI
     const { data: video, error: vidErr } = await supabase
@@ -213,13 +237,13 @@ Deno.serve(async (req) => {
     // Update status
     await supabase.from("projects").update({ status: "generating_reel" }).eq("id", projectId);
 
-    console.log(`[generate-reel] Trimming ${highlights.length} clips for project ${projectId}`);
+    console.log(`[generate-reel] Trimming ${selectedHighlights.length} clips for project ${projectId}`);
 
     // 3) Trim all highlight clips in parallel — failures drop gracefully
-    console.log(`[generate-reel] Trimming ${highlights.length} clips in parallel for project ${projectId}`);
+    console.log(`[generate-reel] Trimming ${selectedHighlights.length} clips in parallel for project ${projectId}`);
 
     const trimResults = await Promise.allSettled(
-      highlights.map(async (hl: any) => {
+      selectedHighlights.map(async (hl: any) => {
         console.log(`[generate-reel] Trimming highlight ${hl.id}: ${hl.start_sec}s → ${hl.end_sec}s`);
         const result = await falRun("fal-ai/workflow-utilities/trim-video", {
           video_url: videoUrl,
@@ -239,7 +263,7 @@ Deno.serve(async (req) => {
     const trimmedClips = trimResults
       .map((r, i) => {
         if (r.status === "fulfilled") return r.value;
-        console.error(`[generate-reel] Trim failed for highlight ${highlights[i].id}, skipping: ${(r as PromiseRejectedResult).reason?.message}`);
+        console.error(`[generate-reel] Trim failed for highlight ${selectedHighlights[i].id}, skipping: ${(r as PromiseRejectedResult).reason?.message}`);
         return null;
       })
       .filter(Boolean) as { url: string; start_sec: number }[];

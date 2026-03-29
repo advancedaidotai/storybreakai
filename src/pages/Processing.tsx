@@ -5,22 +5,30 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
 
-type ProjectStatus = "draft" | "uploaded" | "analyzing" | "segments_done" | "highlights_done" | "generating_reel" | "ready" | "complete" | "failed";
+type ProjectStatus = "draft" | "uploaded" | "uploading" | "analyzing" | "segments_done" | "highlights_done" | "breakpoints_done" | "merging" | "generating_reel" | "ready" | "complete" | "failed";
 
 const STEPS = [
-  { key: "uploaded", label: "Getting your video ready...", icon: CloudUpload },
-  { key: "analyzing", label: "Finding the story beats...", icon: Brain },
-  { key: "segments_done", label: "Mapping scene boundaries...", icon: Layers },
+  { key: "uploading", label: "Uploading Video", description: "Transferring to secure cloud storage", icon: CloudUpload },
+  { key: "uploaded", label: "Preparing Analysis", description: "Configuring AI parameters", icon: Layers },
+  { key: "analyzing", label: "AI Video Analysis", description: "Pegasus is analyzing narrative structure", icon: Brain },
+  { key: "segments_done", label: "Detecting Segments", description: "Identifying narrative arcs and scene boundaries", icon: Film },
+  { key: "breakpoints_done", label: "Finding Ad Breaks", description: "Locating semantic narrative valleys", icon: Sparkles },
+  { key: "highlights_done", label: "Scoring Highlights", description: "Ranking most engaging moments", icon: Sparkles },
+  { key: "complete", label: "Finalizing", description: "Preparing your results dashboard", icon: Check },
 ] as const;
 
 function statusToStepIndex(status: ProjectStatus): number {
   switch (status) {
     case "draft": return -1;
-    case "uploaded": return 0;
-    case "analyzing": return 1;
-    case "segments_done": return 2;
-    case "generating_reel": return 3;
-    case "highlights_done": case "ready": case "complete": return 3;
+    case "uploading": return 0;
+    case "uploaded": return 1;
+    case "analyzing": return 2;
+    case "segments_done": return 3;
+    case "breakpoints_done": return 4;
+    case "highlights_done": return 5;
+    case "merging": return 5;
+    case "generating_reel": return 6;
+    case "ready": case "complete": return 6;
     case "failed": return -2;
     default: return -1;
   }
@@ -258,8 +266,18 @@ const Processing = () => {
         </div>
       </div>
 
-      <h1 className="text-2xl font-bold tracking-tight text-foreground">Working some magic ✨</h1>
+      <h1 className="text-2xl font-bold tracking-tight text-foreground">Working some magic</h1>
       <p className="text-muted-foreground mt-2 text-center text-sm">Our AI is watching your video and mapping every scene, arc, and highlight. This usually takes a few minutes.</p>
+
+      {/* Elapsed time */}
+      {elapsedSec > 0 && !isFailed && (
+        <div className="flex items-center gap-2 mt-3">
+          <Clock className="h-3.5 w-3.5 text-muted-foreground/50" />
+          <span className="text-xs font-mono text-muted-foreground/60">
+            Elapsed: {Math.floor(elapsedSec / 60)}:{(elapsedSec % 60).toString().padStart(2, "0")}
+          </span>
+        </div>
+      )}
 
       {/* Timeout warnings */}
       {elapsedSec >= 600 && !isFailed && (
@@ -287,44 +305,60 @@ const Processing = () => {
         </div>
       )}
 
-      {/* Stepper */}
-      <div className="mt-10 w-full max-w-sm space-y-0">
+      {/* 7-Step Pipeline Stepper */}
+      <div className="mt-10 w-full max-w-md space-y-0">
         {STEPS.map((step, i) => {
           const Icon = step.icon;
           const isDone = activeStep > i;
           const isActive = activeStep === i;
           const isError = isFailed && isActive;
+          const isPending = !isDone && !isActive;
+
+          // Dynamic description for "Preparing Analysis" step
+          const desc = step.key === "uploaded" && projectMeta?.content_type
+            ? `Configuring AI for ${(projectMeta.content_type || "video").replace("_", " ")} delivery`
+            : step.description;
 
           return (
             <div key={step.key} className="flex gap-4">
+              {/* Step indicator column */}
               <div className="flex flex-col items-center">
-                <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 transition-all duration-500 ${
-                  isDone ? "bg-segment/20 text-segment"
-                  : isActive && !isError ? "bg-primary/20 text-primary animate-pulse glow-blue"
-                  : isError ? "bg-destructive/20 text-destructive"
-                  : "bg-surface-2 text-muted-foreground/40"
+                <div className={`h-9 w-9 rounded-full flex items-center justify-center shrink-0 transition-all duration-500 border-2 ${
+                  isDone ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                  : isActive && !isError ? "bg-blue-500/20 border-blue-500/50 text-blue-400 animate-pulse shadow-[0_0_15px_rgba(59,130,246,0.3)]"
+                  : isError ? "bg-destructive/20 border-destructive/40 text-destructive"
+                  : "bg-surface-2/50 border-border/20 text-muted-foreground/30"
                 }`}>
                   {isDone ? <Check className="h-4 w-4" />
                     : isActive && !isError ? <Loader2 className="h-4 w-4 animate-spin" />
                     : isError ? <AlertCircle className="h-4 w-4" />
-                    : <Icon className="h-4 w-4" />}
+                    : <span className="text-[11px] font-bold">{i + 1}</span>}
                 </div>
                 {i < STEPS.length - 1 && (
-                  <div className={`w-px flex-1 min-h-[32px] transition-colors duration-500 ${isDone ? "bg-segment/30" : "bg-border/30"}`} />
+                  <div className={`w-px flex-1 min-h-[28px] transition-colors duration-500 ${
+                    isDone ? "bg-emerald-500/30" : "bg-border/20 border-l border-dashed border-border/30"
+                  }`} style={isDone ? {} : { width: 0, borderLeftWidth: 1 }} />
                 )}
               </div>
 
-              <div className="pb-6 flex-1">
-                <p className={`font-medium text-sm transition-colors duration-300 ${
-                  isDone ? "text-foreground" : isActive ? (isError ? "text-destructive" : "text-primary") : "text-muted-foreground/50"
+              {/* Step content */}
+              <div className="pb-5 flex-1">
+                <p className={`font-semibold text-sm transition-colors duration-300 ${
+                  isDone ? "text-foreground" : isActive ? (isError ? "text-destructive" : "text-blue-400") : "text-muted-foreground/40"
                 }`}>{step.label}</p>
 
-                {isActive && !isError && (
-                  <p className="text-xs text-primary/70 mt-0.5 font-medium tracking-wide">{encourageMsg}</p>
-                )}
-                {isDone && <p className="text-xs text-segment/70 mt-0.5">Done ✓</p>}
+                {/* Description */}
+                <p className={`text-[11px] mt-0.5 transition-colors duration-300 ${
+                  isDone ? "text-muted-foreground/60" : isActive && !isError ? "text-blue-400/60" : "text-muted-foreground/25"
+                }`}>{desc}</p>
 
-                {/* Chunk sub-progress for the "Analyzing with AI" step */}
+                {isDone && <p className="text-[10px] text-emerald-400/70 mt-1 font-medium">Complete</p>}
+
+                {isActive && !isError && (
+                  <p className="text-[10px] text-blue-400/50 mt-1 font-medium tracking-wide">{encourageMsg}</p>
+                )}
+
+                {/* Chunk sub-progress for the "AI Video Analysis" step */}
                 {isActive && !isError && step.key === "analyzing" && chunkProgress && chunkProgress.total > 1 && (
                   <div className="mt-3 glass-panel rounded-xl p-3 space-y-2 fade-in-600">
                     <div className="flex items-center justify-between">
@@ -336,14 +370,20 @@ const Processing = () => {
                     <Progress value={(chunkProgress.completed / chunkProgress.total) * 100} className="h-1.5" />
                     {chunkProgress.currentChunk && (
                       <p className="text-[10px] text-muted-foreground/70">
-                        {/* chunk_index is 1-based from the DB */}
-                        Analyzing chunk {chunkProgress.currentChunk.index} of {chunkProgress.total}{" "}
+                        Processing chunk {chunkProgress.currentChunk.index} of {chunkProgress.total}{" "}
                         <span className="font-mono text-primary/60">
                           ({formatTimeRange(chunkProgress.currentChunk.start_sec, chunkProgress.currentChunk.end_sec)})
                         </span>
                       </p>
                     )}
                   </div>
+                )}
+
+                {/* Show live scene count on segments step */}
+                {isActive && !isError && step.key === "segments_done" && scenesFound > 0 && (
+                  <p className="text-[10px] text-primary font-medium mt-1 animate-pulse">
+                    {scenesFound} scene{scenesFound !== 1 ? "s" : ""} identified so far
+                  </p>
                 )}
               </div>
             </div>

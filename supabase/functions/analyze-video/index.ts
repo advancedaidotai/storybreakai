@@ -48,6 +48,30 @@ const CONTENT_TYPE_PROMPTS: Record<string, string> = {
 const SEGMENT_TYPES = ["opening", "climax", "story_unit", "transition", "resolution"];
 const VALLEY_TYPES = ["dialogue_pause", "topic_shift", "emotional_resolution", "scene_transition"];
 
+// ─── Duration-aware count expectations ──────────────────────────────────────
+
+function getExpectedCounts(durationSec: number, deliveryTarget: string): {
+  bpMin: number; bpMax: number; segMin: number; segMax: number; hlMin: number; hlMax: number;
+} {
+  const intervals: Record<string, number> = {
+    youtube: 240, streaming: 300, cable_vod: 480, cable: 480, broadcast: 480, ott: 360, social: 180,
+  };
+  const avgInterval = intervals[deliveryTarget] || 360;
+  const estBp = Math.max(1, Math.floor(durationSec / avgInterval));
+  const bpMin = Math.max(1, estBp);
+  const bpMax = Math.max(bpMin + 2, estBp + 3);
+
+  const estSeg = Math.max(2, Math.ceil(durationSec / 150));
+  const segMin = Math.max(2, Math.min(estSeg, 4));
+  const segMax = Math.max(segMin + 2, Math.min(estSeg + 3, 15));
+
+  const estHl = Math.max(2, Math.ceil(durationSec / 120));
+  const hlMin = Math.max(2, Math.min(estHl, 5));
+  const hlMax = Math.max(hlMin + 3, Math.min(estHl + 5, 15));
+
+  return { bpMin, bpMax, segMin, segMax, hlMin, hlMax };
+}
+
 const CHUNK_DURATION = 7200; // 2 hours — raised for demo safety to avoid multi-pass bugs
 const OVERLAP_DURATION = 5 * 60; // 5 min overlap
 const MAX_SINGLE_PASS = 3600; // 60 min
@@ -214,28 +238,54 @@ function extractJSON(text: string): unknown {
 
 // ─── Build prompt ────────────────────────────────────────────────────────────
 
-const DELIVERY_PROMPT_RULES: Record<string, string> = {
-  youtube: "This is for YouTube delivery. Place ad breaks every 3-5 minutes. Favor frequent, short breaks at conversational pauses or topic transitions. Viewers expect mid-roll ads; place them where engagement dips naturally.",
-  cable_vod: "This is for Cable/VOD delivery. Place ad breaks every 8-12 minutes following standard cable commercial pod timing. Align breaks with scene transitions and act-outs. Each break should feel like a natural 'commercial bumper' moment.",
-  cable: "This is for Cable delivery. Place ad breaks every 8-12 minutes following standard cable commercial pod timing. Align breaks with scene transitions and act-outs. Each break should feel like a natural 'commercial bumper' moment.",
-  broadcast: "This is for Broadcast/Master delivery. Follow strict broadcast act structure with breaks only at act boundaries. Breaks must align with fade-to-black or established act-out patterns. Compliance with broadcast standards is critical.",
-  ott: "This is for OTT/Streaming delivery. Place mid-roll ad breaks at natural narrative valleys with flexible timing (typically every 5-10 minutes). Optimize for viewer retention — breaks should feel organic, not forced. Favor moments where the viewer would naturally pause. Shorter, more frequent breaks are preferred over long commercial pods.",
-};
+function getDeliveryPromptRules(deliveryTarget: string, durationSec?: number): string {
+  const isShort = durationSec !== undefined && durationSec > 0 && durationSec < 1800;
+  const rules: Record<string, string> = {
+    youtube: "This is for YouTube delivery. Place ad breaks every 3-5 minutes. Favor frequent, short breaks at conversational pauses or topic transitions. Viewers expect mid-roll ads; place them where engagement dips naturally.",
+    cable_vod: "This is for Cable/VOD delivery. Place ad breaks every 8-12 minutes following standard cable commercial pod timing. Align breaks with scene transitions and act-outs. Each break should feel like a natural 'commercial bumper' moment.",
+    cable: "This is for Cable delivery. Place ad breaks every 8-12 minutes following standard cable commercial pod timing. Align breaks with scene transitions and act-outs. Each break should feel like a natural 'commercial bumper' moment.",
+    broadcast: isShort
+      ? "This is for Broadcast/Master delivery. Since this is shorter content, identify natural narrative valleys for potential ad break insertion. Place breaks at scene transitions, dialogue pauses, and emotional resolution points. Aim for breaks every 2-3 minutes. Still prioritize clean, non-disruptive cut points that align with professional broadcast standards."
+      : "This is for Broadcast/Master delivery. Follow strict broadcast act structure with breaks only at act boundaries. Breaks must align with fade-to-black or established act-out patterns. Compliance with broadcast standards is critical.",
+    ott: "This is for OTT/Streaming delivery. Place mid-roll ad breaks at natural narrative valleys with flexible timing (typically every 5-10 minutes). Optimize for viewer retention — breaks should feel organic, not forced. Favor moments where the viewer would naturally pause. Shorter, more frequent breaks are preferred over long commercial pods.",
+  };
+  return rules[deliveryTarget] || rules.broadcast;
+}
 
 function buildPrompt(opts: {
   s3Uri: string; deliveryLabel: string; deliveryTarget: string; contentType?: string;
+  durationSec?: number;
   chunkContext?: { index: number; total: number; startMin: number; endMin: number; totalMin: number };
 }): string {
-  const { s3Uri, deliveryLabel, deliveryTarget, contentType, chunkContext } = opts;
-  const contentTypeExtra = contentType && CONTENT_TYPE_PROMPTS[contentType] ? ` ${CONTENT_TYPE_PROMPTS[contentType]}` : "";
-  const deliveryRules = DELIVERY_PROMPT_RULES[deliveryTarget] || DELIVERY_PROMPT_RULES.broadcast;
+  const { s3Uri, deliveryLabel, deliveryTarget, contentType, durationSec, chunkContext } = opts;
+
+  // Duration context
+  const durationContext = durationSec && durationSec > 0
+    ? ` This video is approximately ${Math.round(durationSec / 60)} minutes (${durationSec} seconds) long.`
+    : "";
+
+  // Content type: soften "feature_film" for short content
+  const isShortForFeatureFilm = contentType === "feature_film" && durationSec !== undefined && durationSec > 0 && durationSec < 1800;
+  let contentTypeExtra = "";
+  if (isShortForFeatureFilm) {
+    contentTypeExtra = " This is a short film/short-form content. Identify the narrative arc: setup, rising action, climax, and resolution. Focus on scene transitions and tonal shifts as natural break points.";
+  } else if (contentType && CONTENT_TYPE_PROMPTS[contentType]) {
+    contentTypeExtra = ` ${CONTENT_TYPE_PROMPTS[contentType]}`;
+  }
+
+  // Duration-aware delivery rules
+  const deliveryRules = getDeliveryPromptRules(deliveryTarget, durationSec);
+
+  // Dynamic breakpoint/segment/highlight count expectations
+  const effectiveDuration = durationSec && durationSec > 0 ? durationSec : 3600;
+  const counts = getExpectedCounts(effectiveDuration, deliveryTarget);
 
   let chunkPrefix = "";
   if (chunkContext) {
     chunkPrefix = `You are analyzing chunk ${chunkContext.index} of ${chunkContext.total} (from ${chunkContext.startMin}m to ${chunkContext.endMin}m) of a ${contentType || "video"}. The full video is ${chunkContext.totalMin} minutes. Analyze this portion and return timestamps RELATIVE to the start of this chunk (starting at 0). `;
   }
 
-  return `${chunkPrefix}You are a senior Broadcast Standards & Practices editor with 20 years of experience in ad-break placement and content segmentation. Your task is to analyze the video at ${s3Uri} for ${deliveryLabel} format and identify optimal ad-break insertion points.${contentTypeExtra}
+  return `${chunkPrefix}You are a senior Broadcast Standards & Practices editor with 20 years of experience in ad-break placement and content segmentation. Your task is to analyze the video at ${s3Uri} for ${deliveryLabel} format and identify optimal ad-break insertion points.${durationContext}${contentTypeExtra}
 
 ${deliveryRules}
 
@@ -245,7 +295,7 @@ CRITICAL CONSTRAINTS:
 - NEVER cut during high-intensity music, crescendos, or emotional musical peaks. Wait for the music to settle or transition.
 - NEVER place a break within 30 seconds of a previous break ending.
 
-BREAKPOINT DETECTION — Identify 5-7 Semantic Narrative Valleys:
+BREAKPOINT DETECTION — Identify ${counts.bpMin}-${counts.bpMax} Semantic Narrative Valleys:
 A Semantic Narrative Valley is a moment where narrative tension, dialogue density, and musical intensity are all simultaneously low — creating an organic pause where an ad break feels natural rather than intrusive.
 
 For each breakpoint return:
@@ -258,10 +308,10 @@ For each breakpoint return:
 - compliance_notes: any broadcast compliance observations (e.g., "Clean fade to black detected", "Scene ends on wide establishing shot — safe cut point", "No active dialogue or music at this timestamp")
 - type: "natural_pause" or "act_break"
 
-SEGMENTS — Return 4-8 narrative segments:
+SEGMENTS — Return ${counts.segMin}-${counts.segMax} narrative segments:
 Each with start_sec, end_sec, type (opening/story_unit/transition/climax/resolution), summary (1-2 sentence description), confidence (0.0-1.0).
 
-HIGHLIGHTS — Return top 5-10 most engaging moments:
+HIGHLIGHTS — Return top ${counts.hlMin}-${counts.hlMax} most engaging moments:
 Score each by: semantic_importance (plot significance) + emotional_intensity (performance energy) + transition_strength (visual dynamism) + pacing_shift (rhythm change) + usability (standalone clip potential).
 Each with start_sec, end_sec, score (0-100), reason (why this moment stands out), rank_order (1 = best).
 
@@ -329,6 +379,8 @@ async function callPegasus(
           bucketOwner: awsAccountId,
         },
       },
+      maxTokens: 4096,
+      textGenerationConfig: { maxTokenCount: 4096 },
     }),
   });
 
@@ -406,6 +458,15 @@ async function callPegasus(
   console.log(`[analyze-video] Parsed JSON keys: ${Object.keys(rawJSON as Record<string, unknown>)}`);
 
   const { result, logs } = validateAndClean(rawJSON, projectId);
+
+  // Log raw Pegasus response for debugging
+  logs.push({
+    project_id: projectId,
+    log_type: "info",
+    message: `Pegasus raw response (${responseText.length} chars)`,
+    raw_data: { text: responseText.slice(0, 8000), length: responseText.length },
+  });
+
   console.log(`[analyze-video] Validated: ${result.segments.length} segments, ${result.breakpoints.length} breakpoints, ${result.highlights.length} highlights`);
   return { result, logs };
 }
@@ -593,7 +654,7 @@ Deno.serve(async (req) => {
       // ── SINGLE-PASS ──────────────────────────────────────────────
       console.log(`[analyze-video] SINGLE-PASS for project ${projectId} (${durationSec}s, ${contentType})`);
       console.log(`[analyze-video] Starting Pegasus analysis...`);
-      const prompt = buildPrompt({ s3Uri, deliveryLabel, deliveryTarget, contentType });
+      const prompt = buildPrompt({ s3Uri, deliveryLabel, deliveryTarget, contentType, durationSec });
       const { result: analysis, logs } = await callPegasus(prompt, projectId, s3Uri);
       await flushLogs(supabase, logs);
 
@@ -617,6 +678,38 @@ Deno.serve(async (req) => {
           console.warn(`[analyze-video] Could not detect duration from analysis, keeping default`);
           await supabase.from("projects").update({ duration_sec: durationSec }).eq("id", projectId);
         }
+      }
+
+      // ── Segment-boundary fallback for sparse breakpoints ──
+      const counts = getExpectedCounts(durationSec, deliveryTarget);
+      const originalBpCount = analysis.breakpoints.length;
+      if (analysis.breakpoints.length < counts.bpMin && analysis.segments.length >= 2) {
+        console.log(`[analyze-video] Sparse breakpoints: ${analysis.breakpoints.length} < ${counts.bpMin}. Adding segment-boundary fallbacks.`);
+        for (let i = 1; i < analysis.segments.length; i++) {
+          const segStart = analysis.segments[i].start_sec;
+          const tooClose = analysis.breakpoints.some((b) => Math.abs(b.timestamp_sec - segStart) < 30);
+          if (!tooClose && segStart > 30) {
+            analysis.breakpoints.push({
+              timestamp_sec: segStart,
+              type: "natural_pause",
+              reason: `Segment boundary: transition from "${analysis.segments[i - 1].type || "scene"}" to "${analysis.segments[i].type || "scene"}". Natural narrative pause detected.`,
+              confidence: 0.65,
+              lead_in_sec: 3,
+              valley_type: "scene_transition",
+              ad_slot_duration_rec: 30,
+              compliance_notes: "Generated from segment boundary analysis",
+            });
+          }
+        }
+        analysis.breakpoints.sort((a, b) => a.timestamp_sec - b.timestamp_sec);
+
+        const fallbackLogs: AnalysisLog[] = [{
+          project_id: projectId,
+          log_type: "info",
+          message: `Added ${analysis.breakpoints.length - originalBpCount} segment-boundary fallback breakpoints`,
+          raw_data: { original: originalBpCount, final: analysis.breakpoints.length },
+        }];
+        await flushLogs(supabase, fallbackLogs);
       }
 
       console.log(`[analyze-video] Inserting ${analysis.segments.length} segments...`);
@@ -709,6 +802,7 @@ Deno.serve(async (req) => {
           deliveryLabel,
           deliveryTarget,
           contentType,
+          durationSec,
           chunkContext: {
             index: chunkNum,
             total: totalChunks,
