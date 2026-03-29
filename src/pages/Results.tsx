@@ -88,11 +88,7 @@ function confidenceBadgeClasses(c: number | null): string {
   return "bg-destructive/20 text-destructive border-destructive/30";
 }
 
-function s3UriToUrl(uri: string, region: string): string {
-  if (!uri.startsWith("s3://")) return uri;
-  const rest = uri.slice(5); const idx = rest.indexOf("/");
-  return `https://${rest.slice(0, idx)}.s3.${region}.amazonaws.com/${rest.slice(idx + 1)}`;
-}
+// s3UriToUrl removed — presigned URLs now generated server-side via get-video-url edge function
 
 function formatDurationLong(sec: number): string {
   const h = Math.floor(sec / 3600);
