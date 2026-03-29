@@ -261,6 +261,20 @@ const Processing = () => {
       <h1 className="text-2xl font-bold tracking-tight text-foreground">Working some magic ✨</h1>
       <p className="text-muted-foreground mt-2 text-center text-sm">Our AI is watching your video and mapping every scene, arc, and highlight. This usually takes a few minutes.</p>
 
+      {/* Timeout warnings */}
+      {elapsedSec >= 600 && !isFailed && (
+        <div className="w-full max-w-sm mt-4 p-3 rounded-xl border border-destructive/30 bg-destructive/10 text-sm text-destructive flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>Analysis may have stalled. Try refreshing or starting over.</span>
+        </div>
+      )}
+      {elapsedSec >= 300 && elapsedSec < 600 && !isFailed && (
+        <div className="w-full max-w-sm mt-4 p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-sm text-amber-400 flex items-start gap-2">
+          <Clock className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>This is taking longer than expected. Analysis of longer videos may take up to 15 minutes.</span>
+        </div>
+      )}
+
       {/* Stepper */}
       <div className="mt-10 w-full max-w-sm space-y-0">
         {STEPS.map((step, i) => {
