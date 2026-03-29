@@ -869,7 +869,7 @@ function BreakpointDetail({ bp }: { bp: Breakpoint }) {
         </div>
       )}
       <Row label="Timestamp" value={formatTime(bp.timestamp_sec)} mono />
-      {bp.lead_in_sec != null && <Row label="Lead-In" value={formatTime(bp.lead_in_sec)} mono />}
+      {bp.lead_in_sec != null && <Row label="Lead-In" value={`${bp.lead_in_sec}s`} mono />}
       <ConfidenceRow value={bp.confidence} />
       {bp.ad_slot_duration_rec && <Row label="Ad Slot Rec." value={`${bp.ad_slot_duration_rec}s`} />}
       {bp.reason && <ReasonBox title="Why This Break" text={bp.reason} />}
