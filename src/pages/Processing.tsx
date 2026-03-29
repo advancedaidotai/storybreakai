@@ -374,23 +374,39 @@ const Processing = () => {
                   <p className="text-[10px] text-blue-400/50 mt-1 font-medium tracking-wide">{encourageMsg}</p>
                 )}
 
-                {/* Chunk sub-progress for the "AI Video Analysis" step */}
-                {isActive && !isError && step.key === "analyzing" && chunkProgress && chunkProgress.total > 1 && (
-                  <div className="mt-3 glass-panel rounded-xl p-3 space-y-2 fade-in-600">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-muted-foreground font-medium">Multi-pass Analysis</span>
-                      <span className="text-[11px] font-mono text-primary">
-                        {chunkProgress.completed} / {chunkProgress.total} chunks
-                      </span>
-                    </div>
-                    <Progress value={(chunkProgress.completed / chunkProgress.total) * 100} className="h-1.5" />
-                    {chunkProgress.currentChunk && (
-                      <p className="text-[10px] text-muted-foreground/70">
-                        Processing chunk {chunkProgress.currentChunk.index} of {chunkProgress.total}{" "}
-                        <span className="font-mono text-primary/60">
-                          ({formatTimeRange(chunkProgress.currentChunk.start_sec, chunkProgress.currentChunk.end_sec)})
-                        </span>
-                      </p>
+                {/* Activity indicator for any active step */}
+                {isActive && !isError && (
+                  <div className="mt-3 space-y-2 fade-in-600">
+                    {/* Indeterminate shimmer bar when no chunk data yet */}
+                    {!(step.key === "analyzing" && chunkProgress && chunkProgress.total > 0) && (
+                      <div className="w-full h-1.5 rounded-full bg-surface-2/60 overflow-hidden">
+                        <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-blue-500/40 via-blue-400 to-blue-500/40 animate-[shimmer_2s_ease-in-out_infinite]" />
+                      </div>
+                    )}
+
+                    {/* Chunk sub-progress for the "AI Video Analysis" step */}
+                    {step.key === "analyzing" && chunkProgress && chunkProgress.total > 0 && (
+                      <div className="glass-panel rounded-xl p-3 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-muted-foreground font-medium">
+                            {chunkProgress.total > 1 ? "Multi-pass Analysis" : "Analyzing Video"}
+                          </span>
+                          <span className="text-[11px] font-mono text-primary">
+                            {chunkProgress.total > 1
+                              ? `${chunkProgress.completed} / ${chunkProgress.total} chunks`
+                              : chunkProgress.completed > 0 ? "Complete" : "In progress…"}
+                          </span>
+                        </div>
+                        <Progress value={chunkProgress.total > 0 ? (chunkProgress.completed / chunkProgress.total) * 100 : 0} className="h-1.5" />
+                        {chunkProgress.currentChunk && (
+                          <p className="text-[10px] text-muted-foreground/70">
+                            Processing {chunkProgress.total > 1 ? `chunk ${chunkProgress.currentChunk.index} of ${chunkProgress.total} ` : ""}
+                            <span className="font-mono text-primary/60">
+                              ({formatTimeRange(chunkProgress.currentChunk.start_sec, chunkProgress.currentChunk.end_sec)})
+                            </span>
+                          </p>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
