@@ -582,6 +582,15 @@ async function callPegasus(
 
   const { result, logs } = validateAndClean(rawJSON, projectId);
   console.log(`[analyze-video] Validated: ${result.segments.length} segments, ${result.breakpoints.length} breakpoints, ${result.highlights.length} highlights`);
+
+  // Store the raw Pegasus response for auditability — truncate to 50KB to stay within column limits
+  logs.push({
+    project_id: projectId,
+    log_type: "pegasus_raw_response",
+    message: `Raw Pegasus response (${responseText.length} chars)`,
+    raw_data: { response_text: responseText.slice(0, 50000), response_length: responseText.length },
+  });
+
   return { result, logs };
 }
 
