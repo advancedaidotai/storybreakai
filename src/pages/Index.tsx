@@ -872,7 +872,7 @@ const Index = () => {
                 size="lg"
                 className="w-full rounded-xl h-12 text-sm font-semibold btn-hover disabled:opacity-40 disabled:shadow-none"
                 style={{ background: formValid && !isBusy ? "linear-gradient(135deg, hsl(187 92% 42%), hsl(217 91% 55%))" : undefined }}
-                disabled={!formValid || isBusy}
+                disabled={!formValid || isBusy || codecBlocked}
                 onClick={() => { setTouched(true); if (formValid) handleUpload(); }}
               >
                 {isBusy ? (
