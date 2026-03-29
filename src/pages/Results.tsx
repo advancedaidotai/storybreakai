@@ -1,6 +1,10 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState, useRef, useCallback, useMemo } from "react";
-import { Play, Sparkles, Star, Download, FileJson, Zap, Loader2 } from "lucide-react";
+import {
+  Play, Sparkles, Star, Download, FileJson, Zap, Loader2,
+  MessageCircle, ArrowRightLeft, Heart, Film, Package,
+  Clock, Shield, Timer,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +26,10 @@ interface Breakpoint {
   type: string | null;
   reason: string | null;
   confidence: number | null;
+  lead_in_sec: number | null;
+  valley_type: string | null;
+  ad_slot_duration_rec: number | null;
+  compliance_notes: string | null;
 }
 
 interface Highlight {
@@ -56,10 +64,25 @@ const SEGMENT_LABELS: Record<string, string> = {
   resolution: "Resolution",
 };
 
+const VALLEY_CONFIG: Record<string, { icon: typeof MessageCircle; label: string; color: string }> = {
+  dialogue_pause: { icon: MessageCircle, label: "Dialogue Pause", color: "text-blue-400" },
+  topic_shift: { icon: ArrowRightLeft, label: "Topic Shift", color: "text-amber-400" },
+  emotional_resolution: { icon: Heart, label: "Emotional Resolution", color: "text-rose-400" },
+  scene_transition: { icon: Film, label: "Scene Transition", color: "text-purple-400" },
+};
+
 function formatTime(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);
   return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
+
+function formatTimecode(sec: number, fps = 24): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.floor((sec % 3600) / 60);
+  const s = Math.floor(sec % 60);
+  const f = Math.round((sec % 1) * fps);
+  return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}:${f.toString().padStart(2, "0")}`;
 }
 
 function confidenceColor(c: number | null): string {
@@ -69,6 +92,13 @@ function confidenceColor(c: number | null): string {
   return "text-destructive";
 }
 
+function confidenceBadgeClasses(c: number | null): string {
+  if (c === null) return "bg-muted/30 text-muted-foreground";
+  if (c >= 0.85) return "bg-emerald-500/20 text-emerald-400 border-emerald-500/30";
+  if (c >= 0.65) return "bg-amber-500/20 text-amber-400 border-amber-500/30";
+  return "bg-destructive/20 text-destructive border-destructive/30";
+}
+
 function s3UriToUrl(uri: string, region: string): string {
   if (!uri.startsWith("s3://")) return uri;
   const rest = uri.slice(5);
@@ -76,6 +106,50 @@ function s3UriToUrl(uri: string, region: string): string {
   const bucket = rest.slice(0, idx);
   const key = rest.slice(idx + 1);
   return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+}
+
+// ─── EDL + OTT export helpers ────────────────────────────────────────────────
+
+function generateEDL(breakpoints: Breakpoint[], title: string): string {
+  const lines = [
+    "TITLE: " + title,
+    "FCM: NON-DROP FRAME",
+    "",
+  ];
+  breakpoints.forEach((bp, i) => {
+    const eventNum = String(i + 1).padStart(3, "0");
+    const tc = formatTimecode(bp.timestamp_sec);
+    const leadIn = bp.lead_in_sec ? formatTimecode(bp.lead_in_sec) : formatTimecode(Math.max(0, bp.timestamp_sec - 2));
+    lines.push(
+      `${eventNum}  001      V     C        ${leadIn} ${tc} ${leadIn} ${tc}`,
+      `* VALLEY_TYPE: ${bp.valley_type || "unknown"}`,
+      `* REASON: ${bp.reason || "N/A"}`,
+      `* AD_SLOT_DURATION: ${bp.ad_slot_duration_rec ?? "N/A"}s`,
+      `* COMPLIANCE: ${bp.compliance_notes || "N/A"}`,
+      "",
+    );
+  });
+  return lines.join("\n");
+}
+
+function generateOTTManifest(breakpoints: Breakpoint[], projectId: string) {
+  return {
+    version: "1.0",
+    project_id: projectId,
+    format: "VMAP",
+    generated_at: new Date().toISOString(),
+    ad_breaks: breakpoints.map((bp, i) => ({
+      ad_slot_id: `${projectId}_slot_${i + 1}`,
+      position_sec: bp.timestamp_sec,
+      time_offset: formatTimecode(bp.timestamp_sec),
+      duration_rec: bp.ad_slot_duration_rec ?? 30,
+      context_type: bp.valley_type || "natural_pause",
+      break_type: "linear",
+      confidence: bp.confidence,
+      compliance_notes: bp.compliance_notes || null,
+      reason: bp.reason || null,
+    })),
+  };
 }
 
 // ─── Skeleton Components ─────────────────────────────────────────────────────
@@ -204,6 +278,37 @@ const Results = () => {
     window.open(reelUrl, "_blank");
   }, [reelUrl]);
 
+  const handleDownloadMasterPackage = useCallback(() => {
+    const edl = generateEDL(breakpoints, projectTitle || "StoryBreak Export");
+    const ott = generateOTTManifest(breakpoints, projectId || "");
+
+    const edlBlob = new Blob([edl], { type: "text/plain" });
+    const ottBlob = new Blob([JSON.stringify(ott, null, 2)], { type: "application/json" });
+
+    // Download EDL
+    const edlUrl = URL.createObjectURL(edlBlob);
+    const edlA = document.createElement("a");
+    edlA.href = edlUrl;
+    edlA.download = `storybreak-${projectId}.edl`;
+    edlA.click();
+    URL.revokeObjectURL(edlUrl);
+
+    // Download OTT manifest
+    setTimeout(() => {
+      const ottUrl = URL.createObjectURL(ottBlob);
+      const ottA = document.createElement("a");
+      ottA.href = ottUrl;
+      ottA.download = `storybreak-${projectId}-ott-manifest.json`;
+      ottA.click();
+      URL.revokeObjectURL(ottUrl);
+    }, 200);
+  }, [breakpoints, projectTitle, projectId]);
+
+  const handleBreakpointCardClick = useCallback((bp: Breakpoint) => {
+    setSelected({ kind: "breakpoint", data: bp });
+    seekTo(Math.max(0, bp.timestamp_sec - 10));
+  }, [seekTo]);
+
   if (!projectId) return <DemoResults />;
 
   if (loading) {
@@ -298,10 +403,22 @@ const Results = () => {
             selected={selected}
             onExportJSON={handleExportJSON}
             onDownloadReel={handleDownloadReel}
+            onDownloadMasterPackage={handleDownloadMasterPackage}
             reelUrl={reelUrl}
           />
         </div>
       </div>
+
+      {/* Breakpoint Storyboard Strip */}
+      {breakpoints.length > 0 && (
+        <div className="fade-in-600 fade-in-delay-2">
+          <BreakpointStoryboard
+            breakpoints={breakpoints}
+            selected={selected}
+            onCardClick={handleBreakpointCardClick}
+          />
+        </div>
+      )}
 
       {/* Timeline */}
       <div className="fade-in-600 fade-in-delay-3">
@@ -319,6 +436,94 @@ const Results = () => {
     </div>
   );
 };
+
+// ─── Breakpoint Storyboard ───────────────────────────────────────────────────
+
+function BreakpointStoryboard({
+  breakpoints,
+  selected,
+  onCardClick,
+}: {
+  breakpoints: Breakpoint[];
+  selected: SelectedItem | null;
+  onCardClick: (bp: Breakpoint) => void;
+}) {
+  return (
+    <div className="glass-panel-elevated rounded-2xl p-4">
+      <h2 className="font-semibold text-xs tracking-wide uppercase text-foreground/80 mb-3 flex items-center gap-2">
+        <Zap className="h-3.5 w-3.5 text-breakpoint" />
+        Ad-Break Storyboard
+      </h2>
+      <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
+        {breakpoints.map((bp, i) => {
+          const isSelected = selected?.kind === "breakpoint" && selected.data.id === bp.id;
+          const valley = VALLEY_CONFIG[bp.valley_type || ""] || VALLEY_CONFIG.scene_transition;
+          const ValleyIcon = valley.icon;
+          const confNorm = bp.confidence !== null ? (bp.confidence > 1 ? bp.confidence / 100 : bp.confidence) : null;
+
+          return (
+            <div
+              key={bp.id}
+              onClick={() => onCardClick(bp)}
+              className={`
+                flex-shrink-0 w-52 p-3.5 rounded-xl cursor-pointer transition-all duration-300
+                glass-tooltip border
+                ${isSelected
+                  ? "border-primary/50 ring-1 ring-primary/30 scale-[1.02]"
+                  : "border-border/20 hover:border-border/40 hover:scale-[1.01]"
+                }
+              `}
+            >
+              {/* Header: number + timestamp */}
+              <div className="flex items-center justify-between mb-2.5">
+                <span className="text-[10px] font-bold text-muted-foreground/60">
+                  BREAK {i + 1}
+                </span>
+                <span className="text-xs font-mono font-semibold text-foreground">
+                  {formatTime(bp.timestamp_sec)}
+                </span>
+              </div>
+
+              {/* Valley type */}
+              <div className="flex items-center gap-2 mb-2">
+                <ValleyIcon className={`h-4 w-4 ${valley.color}`} />
+                <span className="text-[11px] font-medium text-foreground">
+                  {valley.label}
+                </span>
+              </div>
+
+              {/* Confidence + Ad slot */}
+              <div className="flex items-center gap-2 mb-2">
+                <Badge
+                  variant="outline"
+                  className={`text-[9px] px-1.5 py-0 h-4 ${confidenceBadgeClasses(confNorm)}`}
+                >
+                  {confNorm !== null ? `${(confNorm * 100).toFixed(0)}%` : "—"}
+                </Badge>
+                {bp.ad_slot_duration_rec && (
+                  <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <Timer className="h-3 w-3" />
+                    {bp.ad_slot_duration_rec}s slot
+                  </span>
+                )}
+              </div>
+
+              {/* Compliance notes */}
+              {bp.compliance_notes && (
+                <div className="flex items-start gap-1.5 mt-1">
+                  <Shield className="h-3 w-3 text-muted-foreground/50 mt-0.5 shrink-0" />
+                  <p className="text-[9px] text-muted-foreground/70 line-clamp-2 leading-relaxed">
+                    {bp.compliance_notes}
+                  </p>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // ─── Timeline Tooltip ────────────────────────────────────────────────────────
 
@@ -452,7 +657,9 @@ function Timeline({
                 <div className="text-[10px]">
                   <p className="font-semibold" style={{ color: "#F59E0B" }}>Breakpoint</p>
                   <p className="text-muted-foreground font-mono">{formatTime(bp.timestamp_sec)}</p>
-                  <p className="text-muted-foreground capitalize">{(bp.type || "").replace("_", " ")}</p>
+                  {bp.valley_type && (
+                    <p className="text-muted-foreground capitalize">{bp.valley_type.replace("_", " ")}</p>
+                  )}
                   {bp.reason && <p className="text-muted-foreground mt-1 line-clamp-2">{bp.reason}</p>}
                 </div>
               }
@@ -544,11 +751,13 @@ function DetailPanel({
   selected,
   onExportJSON,
   onDownloadReel,
+  onDownloadMasterPackage,
   reelUrl,
 }: {
   selected: SelectedItem | null;
   onExportJSON: () => void;
   onDownloadReel: () => void;
+  onDownloadMasterPackage: () => void;
   reelUrl: string | null;
 }) {
   return (
@@ -583,6 +792,14 @@ function DetailPanel({
             <FileJson className="h-3.5 w-3.5" /> Export JSON
           </Button>
           <Button
+            variant="outline"
+            size="sm"
+            className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover"
+            onClick={onDownloadMasterPackage}
+          >
+            <Package className="h-3.5 w-3.5" /> Download Master Package
+          </Button>
+          <Button
             size="sm"
             className="w-full gap-2 rounded-xl text-xs h-8 glow-blue btn-hover"
             onClick={onDownloadReel}
@@ -608,12 +825,34 @@ function SegmentDetail({ seg }: { seg: Segment }) {
 }
 
 function BreakpointDetail({ bp }: { bp: Breakpoint }) {
+  const valley = VALLEY_CONFIG[bp.valley_type || ""];
+  const ValleyIcon = valley?.icon || Zap;
+
   return (
     <div className="space-y-2.5 text-xs">
-      <Row label="Type" value={(bp.type || "natural_pause").replace("_", " ")} />
+      {/* Valley type hero */}
+      {valley && (
+        <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-surface-0/60 border border-border/20">
+          <div className={`h-8 w-8 rounded-lg bg-surface-1/80 flex items-center justify-center`}>
+            <ValleyIcon className={`h-4 w-4 ${valley.color}`} />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground text-[11px]">{valley.label}</p>
+            <p className="text-[10px] text-muted-foreground">Narrative Valley</p>
+          </div>
+        </div>
+      )}
+
       <Row label="Timestamp" value={formatTime(bp.timestamp_sec)} mono />
+      {bp.lead_in_sec !== null && bp.lead_in_sec !== undefined && (
+        <Row label="Lead-In" value={formatTime(bp.lead_in_sec)} mono />
+      )}
       <ConfidenceRow value={bp.confidence} />
+      {bp.ad_slot_duration_rec && (
+        <Row label="Ad Slot Rec." value={`${bp.ad_slot_duration_rec}s`} />
+      )}
       {bp.reason && <ReasonBox title="Why This Break" text={bp.reason} />}
+      {bp.compliance_notes && <ReasonBox title="Compliance Notes" text={bp.compliance_notes} />}
     </div>
   );
 }
