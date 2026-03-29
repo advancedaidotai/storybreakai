@@ -27,7 +27,7 @@ import { AdBreakStoryboard } from "@/components/results/AdBreakStoryboard";
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Segment { id: string; start_sec: number; end_sec: number; type: string; summary: string | null; confidence: number | null; }
-interface Breakpoint { id: string; timestamp_sec: number; type: string | null; reason: string | null; confidence: number | null; lead_in_sec: number | null; valley_type: string | null; ad_slot_duration_rec: number | null; compliance_notes: string | null; }
+interface Breakpoint { id: string; timestamp_sec: number; type: string | null; reason: string | null; confidence: number | null; lead_in_sec: number | null; valley_type: string | null; ad_slot_duration_rec: number | null; compliance_notes: string | null; approval_status?: string; boundary_reasons?: string[]; }
 interface Highlight { id: string; start_sec: number; end_sec: number; score: number | null; reason: string | null; rank_order: number | null; }
 interface AnalysisChunk { id: string; chunk_index: number; start_sec: number; end_sec: number; overlap_start_sec: number | null; overlap_end_sec: number | null; }
 interface ProjectInfo { title: string; content_type: string | null; content_metadata: any; delivery_target: string | null; duration_sec: number | null; }
