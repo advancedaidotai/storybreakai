@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { BedrockRuntimeClient, InvokeModelCommand } from "npm:@aws-sdk/client-bedrock-runtime";
-import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3";
+import { S3Client } from "npm:@aws-sdk/client-s3";
+import { Upload } from "npm:@aws-sdk/lib-storage";
 import { GetCallerIdentityCommand, STSClient } from "npm:@aws-sdk/client-sts";
 
 const corsHeaders = {
