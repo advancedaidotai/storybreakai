@@ -1034,9 +1034,8 @@ const Results = () => {
 
     return {
       analysis: fetchError && !analysisOk ? "failed" : analysisOk ? "ready" : "unavailable",
-      edl: hasBreakpoints ? "ready" : analysisOk ? "unavailable" : "unavailable",
-      ottJson: hasBreakpoints ? "ready" : analysisOk ? "unavailable" : "unavailable",
-      highlightReel: "unavailable" as const, // reel generation disabled for stability
+      edl: hasBreakpoints ? "ready" : "unavailable",
+      ottJson: hasBreakpoints ? "ready" : "unavailable",
     };
   }, [segments, breakpoints, fetchError]);
 
