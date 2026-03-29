@@ -161,21 +161,20 @@ const Processing = () => {
     
     supabase.functions.invoke("analyze-video", { body: { project_id: projectId } })
       .then(({ data, error: fnErr }) => {
-        // The Supabase SDK puts a generic message in fnErr for non-2xx responses,
-        // but the actual error detail is in the data body
+        // The Supabase SDK sets fnErr for non-2xx responses with a generic message.
+        // The actual error detail may be in data.error or fnErr.context.
         const serverError = data?.error;
+        const contextError = (fnErr as any)?.context?.error;
         if (fnErr || serverError) {
-          const detail = serverError || fnErr?.message || "Unknown error";
-          console.error("[Processing] analyze-video error:", detail);
+          const detail = serverError || contextError || fnErr?.message || "Unknown error";
+          console.error("[Processing] analyze-video error:", detail, { data, fnErr });
           setError(`Analysis error: ${detail}`);
           setStatus("failed");
-        } else {
-          
         }
       })
       .catch((err: any) => {
         console.error("[Processing] analyze-video unexpected error:", err);
-        setError("Failed to connect to analysis service. Please retry.");
+        setError(`Analysis failed to start: ${err?.message || "Could not connect to analysis service"}. Please retry.`);
         setStatus("failed");
       });
   }, [projectId, status]);
