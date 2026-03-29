@@ -385,6 +385,7 @@ const Index = () => {
 
   const checkCodecSupport = useCallback((file: File) => {
     setCodecWarning(null);
+    setCodecBlocked(false);
     const video = document.createElement("video");
     video.preload = "metadata";
     const blobUrl = URL.createObjectURL(file);
@@ -392,18 +393,16 @@ const Index = () => {
     const cleanup = () => { URL.revokeObjectURL(blobUrl); };
 
     video.onloadedmetadata = () => {
-      // If the browser can't decode the codec, dimensions will be 0
       if (video.videoWidth === 0 && video.videoHeight === 0) {
         setCodecWarning(
-          "This video may use an unsupported codec (e.g. HEVC/H.265, VP9, or AV1). Our AI model requires H.264/AVC in an MP4 container. Analysis will likely fail — please re-encode with H.264 if possible."
+          "This video uses an unsupported codec. StoryBreak AI requires H.264 (AVC) video in an MP4 container. Please re-encode your video and try again."
         );
+        setCodecBlocked(true);
         cleanup();
         return;
       }
-      // Additional check: see if the browser reports the MIME as playable
       const mime = file.type || "video/mp4";
       if (typeof MediaSource !== "undefined" && !MediaSource.isTypeSupported(mime)) {
-        // Not all browsers flag this, so only warn — don't block
         const ext = file.name.split(".").pop()?.toLowerCase();
         if (ext !== "mp4" && ext !== "mov") {
           setCodecWarning(
@@ -416,8 +415,9 @@ const Index = () => {
 
     video.onerror = () => {
       setCodecWarning(
-        "We couldn't read this video's codec information. It may use an unsupported format. For reliable analysis, use H.264/AVC in an MP4 container."
+        "We couldn't read this video. The file may be corrupt or use an unsupported format. Please use an H.264/MP4 file."
       );
+      setCodecBlocked(true);
       cleanup();
     };
 
