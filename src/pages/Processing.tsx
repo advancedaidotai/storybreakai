@@ -159,14 +159,6 @@ const Processing = () => {
       });
   }, [projectId, status]);
 
-  // Skip reel generation — navigate to results once highlights are done
-  useEffect(() => {
-    if (!projectId) return;
-    if (status === "highlights_done" || status === "ready") {
-      console.log("[Processing] Analysis complete — navigating to results");
-      navigate(`/results/${projectId}`, { replace: true });
-    }
-  }, [projectId, status, navigate]);
 
   // Generate thumbnail timestamps periodically from video
   useEffect(() => {
