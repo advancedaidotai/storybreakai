@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 import { BedrockRuntimeClient, InvokeModelCommand } from "npm:@aws-sdk/client-bedrock-runtime";
-import { S3Client, PutObjectCommand } from "npm:@aws-sdk/client-s3";
+import { S3Client, PutObjectCommand, HeadObjectCommand } from "npm:@aws-sdk/client-s3";
 import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner";
 import { STSClient, GetCallerIdentityCommand } from "npm:@aws-sdk/client-sts";
 
