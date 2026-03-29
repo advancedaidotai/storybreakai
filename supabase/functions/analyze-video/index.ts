@@ -75,6 +75,42 @@ interface RawBreakpoint { timestamp_sec: number; type: string; reason?: string; 
 interface RawHighlight { start_sec: number; end_sec: number; score: number; reason?: string; rank_order?: number; }
 interface AnalysisResult { segments: RawSegment[]; breakpoints: RawBreakpoint[]; highlights: RawHighlight[]; }
 
+function normalizeKnownAnalysisError(message: string): string {
+  const msg = message.toLowerCase();
+
+  if (msg.includes("unprocessable video") || msg.includes("video format not supported") || msg.includes("codec")) {
+    return "This video can't be processed by the AI model in its current format. Please re-encode it to H.264 video + AAC audio in an MP4 container, then retry.";
+  }
+
+  if (msg.includes("failed to download video (404)")) {
+    return "The video URL is not reachable (404). Please verify the exact direct video URL and try again.";
+  }
+
+  if (msg.includes("failed to download video")) {
+    return "The video URL could not be downloaded by the analysis service. Please verify the link is public and directly points to a video file.";
+  }
+
+  if (msg.includes("video file too large")) {
+    return "The video file exceeds the maximum allowed size for processing. Please use a smaller file or compress it and retry.";
+  }
+
+  return message;
+}
+
+function isKnownAnalysisInputError(message: string): boolean {
+  const msg = message.toLowerCase();
+  return (
+    msg.includes("unprocessable video") ||
+    msg.includes("video format not supported") ||
+    msg.includes("codec") ||
+    msg.includes("failed to download video") ||
+    msg.includes("unsupported video uri scheme") ||
+    msg.includes("video file too large") ||
+    msg.includes("no response body from video url") ||
+    msg.includes("no valid segments after normalization")
+  );
+}
+
 function validateAndClean(raw: unknown, projectId: string): { result: AnalysisResult; logs: AnalysisLog[] } {
   const logs: AnalysisLog[] = [];
   if (!raw || typeof raw !== "object") throw new Error("Response is not an object");
@@ -735,7 +771,7 @@ Deno.serve(async (req) => {
 
       if (analysis.segments.length === 0) {
         await supabase.from("projects").update({ status: "failed" }).eq("id", projectId);
-        return new Response(JSON.stringify({ error: "AI returned no valid segments after normalization" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ error: "AI returned no valid segments after normalization" }), { status: 422, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       // Auto-detect real duration from analysis output
@@ -930,13 +966,28 @@ Deno.serve(async (req) => {
       status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err: any) {
-    console.error(`[analyze-video] Error for project ${projectId}:`, err.message);
+    const rawError = err?.message || "Analysis failed";
+    const knownInputError = isKnownAnalysisInputError(rawError);
+    const userError = normalizeKnownAnalysisError(rawError);
+
+    console.error(`[analyze-video] Error for project ${projectId}:`, userError);
+
     if (projectId) {
       const { error: failErr } = await supabase.from("projects").update({ status: "failed" }).eq("id", projectId);
       if (failErr) console.error("[analyze-video] Failed to set project failed status:", failErr.message);
+
+      const { error: logErr } = await supabase.from("analysis_logs").insert({
+        project_id: projectId,
+        log_type: "parse_error",
+        message: userError,
+        raw_data: { raw_error: rawError },
+      });
+      if (logErr) console.error("[analyze-video] Failed to write analysis error log:", logErr.message);
     }
-    return new Response(JSON.stringify({ error: err.message || "Analysis failed" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+
+    return new Response(JSON.stringify({ error: userError }), {
+      status: knownInputError ? 422 : 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
