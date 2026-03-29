@@ -94,10 +94,13 @@ function LabelledInput({ label, required, ...props }: { label: string; required?
 
 const Index = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef(false);
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [demoMode, setDemoMode] = useState(() => searchParams.get("demo") === "1");
+  const [demoLoading, setDemoLoading] = useState(false);
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [fileName, setFileName] = useState("");
   const [fileSize, setFileSize] = useState(0);
