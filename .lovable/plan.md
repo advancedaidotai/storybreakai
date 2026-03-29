@@ -1,23 +1,36 @@
 
 
-## Add Confirmation Step to Re-Analyze Modal
+## NLE Integration: Add FCP XML and AAF-Compatible XML Exports
 
 ### What Changes
-Add a two-step flow inside the existing Re-Analyze dialog: after clicking "Start Re-Analysis", show a warning confirmation before proceeding.
+Expand the existing export system to include two additional industry-standard NLE formats alongside the current CMX 3600 EDL:
+- **Final Cut Pro XML (FCPXML)** — native import for FCP and DaVinci Resolve
+- **Adobe Premiere XML** — compatible with Premiere Pro, Avid via AAF-equivalent XML interchange
+
+The "Get EDL + OTT Package" button becomes a dropdown/expanded export section offering all formats.
 
 ### Implementation
+
 **File: `src/pages/Results.tsx`**
 
-1. Add a `reAnalyzeConfirm` boolean state (default `false`).
+1. **Add two generator functions** next to existing `generateEDL` and `generateOTTManifest`:
+   - `generateFCPXML(breakpoints, segments, title, durationSec)` — produces FCPXML v1.9 with markers at each breakpoint timecode, segment clips as storyline items, and proper `<fcpxml>` root structure
+   - `generatePremiereXML(breakpoints, segments, title, durationSec)` — produces Premiere-compatible XML (xmeml format) with a sequence containing markers at breakpoint positions
 
-2. Split the modal into two views using conditional rendering:
-   - **Step 1 (default)**: Current form with delivery target + content type selects. "Start Re-Analysis" button now sets `reAnalyzeConfirm = true` instead of calling `handleReAnalyze`.
-   - **Step 2 (confirm)**: Warning message with `AlertTriangle` icon stating: *"This will permanently delete all existing segments, breakpoints, highlights, and analysis data for this project. The video file will be preserved and re-analyzed with your new settings."* Two buttons: "Go Back" (returns to step 1) and "Confirm & Re-Analyze" (calls `handleReAnalyze`).
+2. **Update the `handleDownloadMasterPackage` callback** to download all four files (EDL, OTT JSON, FCPXML, Premiere XML) sequentially with 300ms delays between each.
 
-3. Reset `reAnalyzeConfirm` to `false` when the dialog closes (in `onOpenChange`).
+3. **Update the DetailPanel export section**:
+   - Rename button label from "Get EDL + OTT Package" to "Download NLE Package"
+   - Add individual export buttons for each format: EDL, FCP XML, Premiere XML, OTT JSON
+   - Group under a collapsible "Individual Formats" sub-section so the UI stays clean
+
+4. **Update `ReadinessInfo`** to add an `fcpxml` readiness state (same logic as `edl` — ready when breakpoints exist).
+
+5. **Update readiness indicator list** to show "FCP XML" and "Premiere XML" alongside existing EDL/OTT entries.
 
 ### Technical Detail
-- No new components or files needed — just a conditional render inside the existing `<DialogContent>`.
-- Uses existing `AlertTriangle` from lucide-react for the warning icon.
-- The "Confirm & Re-Analyze" button uses `variant="destructive"` styling to emphasize the destructive action.
+- FCPXML uses DTD v1.9 with `<asset-clip>` and `<marker>` elements; timecodes expressed as rational frames (e.g., `"86400/24s"`)
+- Premiere XML uses the `xmeml` format with `<sequence>` containing `<marker>` nodes — this is the standard interchange format that both Premiere and Avid can import
+- No new dependencies, files, or database changes needed — pure client-side string generation
+- All formats use the same breakpoint/segment data already fetched
 
