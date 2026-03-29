@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
+import { BedrockRuntimeClient, InvokeModelCommand } from "npm:@aws-sdk/client-bedrock-runtime";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -24,58 +25,6 @@ async function flushLogs(supabase: any, logs: AnalysisLog[]) {
   if (logs.length === 0) return;
   const { error } = await supabase.from("analysis_logs").insert(logs);
   if (error) console.error(`[analyze-video] Failed to flush ${logs.length} analysis logs:`, error.message);
-}
-
-// ─── AWS Signature V4 helpers ────────────────────────────────────────────────
-
-function hmacSHA256(key: Uint8Array, msg: string): Promise<ArrayBuffer> {
-  return crypto.subtle
-    .importKey("raw", key, { name: "HMAC", hash: "SHA-256" }, false, ["sign"])
-    .then((k) => crypto.subtle.sign("HMAC", k, new TextEncoder().encode(msg)));
-}
-
-async function sha256(data: Uint8Array): Promise<string> {
-  const buf = await crypto.subtle.digest("SHA-256", data);
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function getSignatureKey(secret: string, date: string, region: string, service: string) {
-  let k = new Uint8Array(await hmacSHA256(new TextEncoder().encode("AWS4" + secret), date));
-  k = new Uint8Array(await hmacSHA256(k, region));
-  k = new Uint8Array(await hmacSHA256(k, service));
-  k = new Uint8Array(await hmacSHA256(k, "aws4_request"));
-  return k;
-}
-
-async function signedBedrockRequest(params: {
-  region: string; accessKey: string; secretKey: string; modelId: string; body: object;
-}): Promise<Response> {
-  const { region, accessKey, secretKey, modelId, body } = params;
-  const service = "bedrock";
-  const host = `bedrock-runtime.${region}.amazonaws.com`;
-  const path = `/model/${modelId}/invoke`;
-  const url = `https://${host}${path}`;
-  const payload = JSON.stringify(body);
-  const payloadBytes = new TextEncoder().encode(payload);
-  const payloadHash = await sha256(payloadBytes);
-  const now = new Date();
-  const amzDate = now.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z/, "Z");
-  const dateStamp = amzDate.slice(0, 8);
-  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
-  const canonicalHeaders = `content-type:application/json\nhost:${host}\nx-amz-date:${amzDate}\n`;
-  const signedHeaders = "content-type;host;x-amz-date";
-  const canonicalRequest = ["POST", path, "", canonicalHeaders, signedHeaders, payloadHash].join("\n");
-  const canonicalRequestHash = await sha256(new TextEncoder().encode(canonicalRequest));
-  const stringToSign = ["AWS4-HMAC-SHA256", amzDate, credentialScope, canonicalRequestHash].join("\n");
-  const signingKey = await getSignatureKey(secretKey, dateStamp, region, service);
-  const signatureBuf = await hmacSHA256(signingKey, stringToSign);
-  const signature = [...new Uint8Array(signatureBuf)].map((b) => b.toString(16).padStart(2, "0")).join("");
-  const authorization = `AWS4-HMAC-SHA256 Credential=${accessKey}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
-  return fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-Amz-Date": amzDate, Authorization: authorization, Accept: "application/json" },
-    body: payload,
-  });
 }
 
 // ─── Constants & types ───────────────────────────────────────────────────────
