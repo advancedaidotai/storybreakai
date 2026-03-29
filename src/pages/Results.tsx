@@ -111,7 +111,8 @@ function generateEDL(breakpoints: Breakpoint[], title: string): string {
       `* VALLEY_TYPE: ${bp.valley_type || "scene_transition"}`,
       `* REASON: ${bp.reason || "Natural narrative pause detected"}`,
       `* CONFIDENCE: ${bp.confidence !== null ? (bp.confidence > 1 ? bp.confidence : (bp.confidence * 100).toFixed(0)) : "N/A"}%`,
-      `* AD_SLOT_DURATION: ${bp.ad_slot_duration_rec ?? 30}s`,
+      `* LEAD_IN: ${bp.lead_in_sec ?? 2}s`,
+      `* AD_SLOT: ${bp.ad_slot_duration_rec ?? 30}s`,
       `* COMPLIANCE: ${bp.compliance_notes || "No specific compliance flags"}`,
       "",
     );
@@ -136,6 +137,7 @@ function generateOTTManifest(breakpoints: Breakpoint[], projectId: string, proje
       valley_type: bp.valley_type || "scene_transition",
       confidence: bp.confidence,
       reason: bp.reason || "Natural narrative pause detected",
+      lead_in_sec: bp.lead_in_sec ?? 2,
       compliance_notes: bp.compliance_notes || "No specific compliance flags",
       ad_slot_duration_rec: bp.ad_slot_duration_rec ?? 30,
     })),
@@ -820,23 +822,94 @@ function SegmentDetail({ seg }: { seg: Segment }) {
   );
 }
 
+const VALLEY_EMOJI_DESCRIPTIONS: Record<string, { emoji: string; description: string }> = {
+  dialogue_pause: { emoji: "\u{1F4AC}", description: "Natural gap in conversation" },
+  topic_shift: { emoji: "\u{1F504}", description: "Content transitions to new subject" },
+  emotional_resolution: { emoji: "\u{1FAB7}", description: "Emotional arc completes" },
+  scene_transition: { emoji: "\u{1F3AC}", description: "Visual or narrative scene change" },
+};
+
+function ConfidenceBar({ value }: { value: number | null }) {
+  if (value === null) return null;
+  const pct = Math.round(value * 100);
+  const barColor = value >= 0.85 ? "bg-emerald-500" : value >= 0.65 ? "bg-amber-500" : "bg-red-500";
+  const textColor = value >= 0.85 ? "text-emerald-400" : value >= 0.65 ? "text-amber-400" : "text-red-400";
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-muted-foreground">Confidence</span>
+        <span className={`text-sm font-bold ${textColor}`}>{pct}%</span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-surface-0/80 overflow-hidden">
+        <div className={`h-full rounded-full transition-all duration-500 ${barColor}`} style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  );
+}
+
 function BreakpointDetail({ bp }: { bp: Breakpoint }) {
   const valley = VALLEY_CONFIG[bp.valley_type || ""];
   const ValleyIcon = valley?.icon || Zap;
+  const emojiInfo = VALLEY_EMOJI_DESCRIPTIONS[bp.valley_type || ""] || { emoji: "\u{26A1}", description: "Narrative pause" };
+
   return (
-    <div className="space-y-2.5 text-xs">
-      {valley && (
-        <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-surface-0/60 border border-border/20">
-          <div className="h-8 w-8 rounded-lg bg-surface-1/80 flex items-center justify-center"><ValleyIcon className={`h-4 w-4 ${valley.color}`} /></div>
-          <div><p className="font-semibold text-foreground text-[11px]">{valley.label}</p><p className="text-[10px] text-muted-foreground">Narrative Valley</p></div>
+    <div className="space-y-3 text-xs">
+      {/* AI Logic Header */}
+      <div className="flex items-center gap-2 pb-2 border-b border-border/20">
+        <Sparkles className="h-4 w-4 text-primary" />
+        <span className="text-[11px] font-bold uppercase tracking-wider text-primary">AI Logic</span>
+      </div>
+
+      {/* Valley Type — prominent with emoji */}
+      <div className="flex items-center gap-3 p-3 rounded-xl bg-surface-0/60 border border-border/20">
+        <div className="h-10 w-10 rounded-xl bg-surface-1/80 flex items-center justify-center shrink-0 border border-border/20">
+          <span className="text-xl">{emojiInfo.emoji}</span>
+        </div>
+        <div className="min-w-0">
+          <p className="font-semibold text-foreground text-[11px]">{valley?.label || "Natural Pause"}</p>
+          <p className="text-[10px] text-muted-foreground">{emojiInfo.description}</p>
+        </div>
+      </div>
+
+      {/* Why Here? — full reason text */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/60 mb-1.5">Why Here?</p>
+        <div className="p-3 rounded-xl bg-surface-0/60 border border-border/20">
+          <p className="text-[11px] text-muted-foreground leading-relaxed">{bp.reason || "Natural narrative pause detected at this timestamp."}</p>
+        </div>
+      </div>
+
+      {/* Confidence — visual bar */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/60 mb-1.5">Confidence</p>
+        <ConfidenceBar value={bp.confidence} />
+      </div>
+
+      {/* Placement Details */}
+      <div>
+        <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/60 mb-1.5">Placement Details</p>
+        <div className="space-y-1.5">
+          <Row label="Timestamp" value={formatTime(bp.timestamp_sec)} mono />
+          {bp.lead_in_sec != null && <Row label="Lead-In Time" value={`${bp.lead_in_sec}s before break`} mono />}
+          {bp.ad_slot_duration_rec != null && (
+            <div className="flex justify-between items-center">
+              <span className="text-muted-foreground">Recommended Ad Duration</span>
+              <Badge variant="outline" className="text-[10px] border-primary/30 text-primary bg-primary/5">{bp.ad_slot_duration_rec}s</Badge>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Compliance Notes */}
+      {bp.compliance_notes && (
+        <div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-foreground/60 mb-1.5">Compliance</p>
+          <div className="flex items-start gap-2 p-2.5 rounded-xl bg-surface-0/60 border border-border/20">
+            <Shield className="h-3.5 w-3.5 text-muted-foreground/50 mt-0.5 shrink-0" />
+            <p className="text-[10px] text-muted-foreground leading-relaxed">{bp.compliance_notes}</p>
+          </div>
         </div>
       )}
-      <Row label="Timestamp" value={formatTime(bp.timestamp_sec)} mono />
-      {bp.lead_in_sec != null && <Row label="Lead-In" value={`${bp.lead_in_sec}s`} mono />}
-      <ConfidenceRow value={bp.confidence} />
-      {bp.ad_slot_duration_rec && <Row label="Ad Slot Rec." value={`${bp.ad_slot_duration_rec}s`} />}
-      {bp.reason && <ReasonBox title="Why This Break" text={bp.reason} />}
-      {bp.compliance_notes && <ReasonBox title="Compliance Notes" text={bp.compliance_notes} />}
     </div>
   );
 }
