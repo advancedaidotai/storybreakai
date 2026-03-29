@@ -1109,13 +1109,47 @@ const Results = () => {
           </div>
         </div>
 
-        {/* Analysis Summary Panel */}
-        <div className="glass-panel rounded-2xl overflow-hidden cinematic-shadow fade-in-600 fade-in-delay-2">
-          <div className="aspect-video bg-primary/[0.02] flex flex-col items-center justify-center gap-3 p-6">
-            <Sparkles className="h-8 w-8 text-primary/40" />
-            <p className="text-sm font-semibold text-foreground">Analysis Complete! 🎬</p>
-            <p className="text-xs text-muted-foreground text-center">Here's what we found: {segments.length} scenes, {breakpoints.length} ad break opportunities, and {highlights.length} highlights.</p>
-          </div>
+        {/* HITL Ad-Break Previewer */}
+        <div className="glass-panel rounded-2xl overflow-hidden cinematic-shadow fade-in-600 fade-in-delay-2 relative">
+          {videoUrl ? (
+            <div className="relative">
+              <video
+                ref={previewVideoRef}
+                src={videoUrl}
+                className="w-full aspect-video bg-surface-0 object-contain"
+                muted={previewPhase === "idle"}
+                preload="metadata"
+                onTimeUpdate={() => {
+                  if (previewPhase === "leadin" && selected?.kind === "breakpoint" && previewVideoRef.current) {
+                    if (previewVideoRef.current.currentTime >= selected.data.timestamp_sec) {
+                      previewVideoRef.current.pause();
+                      setPreviewPhase("ad");
+                    }
+                  }
+                }}
+              />
+              {previewPhase === "ad" && (
+                <div className="absolute inset-0 bg-blue-950/95 flex flex-col items-center justify-center gap-3 animate-fade-in">
+                  <MonitorPlay className="h-12 w-12 text-blue-400 animate-pulse" />
+                  <h3 className="text-xl font-bold tracking-widest uppercase text-foreground">Commercial Break</h3>
+                  <p className="text-sm text-blue-200 font-mono">Simulated Ad Placement · 30s</p>
+                  <Badge variant="outline" className="border-blue-400/50 text-blue-300 bg-blue-900/50">Ad Council Placeholder</Badge>
+                  <button
+                    className="absolute top-3 right-3 h-7 w-7 rounded-lg bg-surface-2/60 flex items-center justify-center hover:bg-destructive/20 transition-colors"
+                    onClick={() => setPreviewPhase("idle")}
+                  >
+                    <span className="text-xs text-muted-foreground">✕</span>
+                  </button>
+                </div>
+              )}
+              <Badge variant="secondary" className="absolute top-2 left-2 text-[10px] bg-accent/90 border-0 text-accent-foreground pointer-events-none">HITL Ad Verifier</Badge>
+            </div>
+          ) : (
+            <div className="aspect-video bg-surface-0 flex flex-col items-center justify-center gap-2">
+              <MonitorPlay className="h-8 w-8 text-muted-foreground/40" />
+              <p className="text-xs text-muted-foreground">Click an ad break to preview</p>
+            </div>
+          )}
         </div>
 
         {/* Detail Panel + Scene Index */}
