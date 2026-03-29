@@ -356,7 +356,14 @@ Deno.serve(async (req) => {
       // ── SINGLE-PASS ──────────────────────────────────────────────
       console.log(`[analyze-video] SINGLE-PASS for project ${projectId} (${durationSec}s, ${contentType})`);
       const prompt = buildPrompt({ s3Uri: video.s3_uri, deliveryLabel, deliveryTarget, contentType });
-      const analysis = await callPegasus(prompt);
+      const { result: analysis, logs } = await callPegasus(prompt, projectId);
+      await flushLogs(supabase, logs);
+
+      if (analysis.segments.length === 0) {
+        await supabase.from("projects").update({ status: "failed" }).eq("id", projectId);
+        return new Response(JSON.stringify({ error: "AI returned no valid segments after normalization" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       console.log(`[analyze-video] Parsed: ${analysis.segments.length} segments, ${analysis.breakpoints.length} breakpoints, ${analysis.highlights.length} highlights`);
       await insertResults(supabase, projectId, analysis);
       await supabase.from("projects").update({ status: "segments_done" }).eq("id", projectId);
