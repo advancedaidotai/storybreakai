@@ -7,6 +7,13 @@ import {
   Clock, Shield, Timer, Minus, Plus, ChevronLeft, ChevronRight,
   List, Diamond, MonitorPlay, Clapperboard, AlertCircle, CheckCircle2, XCircle, Ban, RefreshCw,
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
