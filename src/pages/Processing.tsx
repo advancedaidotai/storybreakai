@@ -233,9 +233,9 @@ const Processing = () => {
           <div className="flex items-start gap-3">
             <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="font-semibold text-xs text-destructive uppercase tracking-wide">Processing Failed</p>
+              <p className="font-semibold text-xs text-destructive uppercase tracking-wide">Something went wrong</p>
               <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-                {error || "An error occurred during analysis. This could be a temporary issue — try again."}
+                {error || "The analysis hit a snag — but don't worry, these things happen. Let's give it another shot."}
               </p>
               <Button size="sm" variant="outline" className="mt-3 text-xs h-8 rounded-lg gap-2 border-destructive/30 hover:bg-destructive/10 text-destructive" onClick={handleRetry} disabled={retrying}>
                 <RefreshCw className={`h-3 w-3 ${retrying ? "animate-spin" : ""}`} />
