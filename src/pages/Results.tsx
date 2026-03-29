@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { useEffect, useState, useRef, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import { toast } from "@/hooks/use-toast";
 import {
   Play, Sparkles, Star, FileJson, Zap, Loader2,
@@ -531,6 +531,11 @@ function Timeline({
       >
         {/* Layer 1: Segments */}
         <div className="relative h-10 bg-surface-0/60 rounded-xl overflow-visible border border-border/20 mb-2">
+          {segments.length === 0 && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-[10px] text-muted-foreground/50">No segments detected</span>
+            </div>
+          )}
           {segments.filter((s) => s.end_sec > visibleStartSec && s.start_sec < visibleEndSec).map((seg) => {
             const left = Math.max(0, toPercent(seg.start_sec));
             const right = Math.min(100, toPercent(seg.end_sec));
@@ -598,6 +603,11 @@ function Timeline({
 
         {/* Layer 3: Highlights */}
         <div className="relative h-7 mb-1">
+          {highlights.length === 0 && (
+            <div className="flex items-center h-full px-2">
+              <span className="text-[10px] text-muted-foreground/40">No highlights detected</span>
+            </div>
+          )}
           {highlights.filter((hl) => isVisible(hl.start_sec)).map((hl) => {
             const left = toPercent(hl.start_sec);
             const scoreFrac = (hl.score || 0) / maxScore;
@@ -694,6 +704,16 @@ function BreakpointStoryboard({ breakpoints, selected, currentTime, onCardClick 
     return null;
   }, [breakpoints, currentTime]);
 
+  if (breakpoints.length === 0) {
+    return (
+      <div className="glass-panel-elevated rounded-2xl p-8 text-center">
+        <Zap className="h-8 w-8 text-muted-foreground/30 mx-auto mb-3" />
+        <h2 className="font-semibold text-sm text-foreground/70 mb-1">No Ad Breaks Detected</h2>
+        <p className="text-xs text-muted-foreground/50">The AI analysis did not identify any ad break insertion points for this content.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="glass-panel-elevated rounded-2xl p-5">
       <h2 className="font-semibold text-xs tracking-wide uppercase text-foreground/80 mb-4 flex items-center gap-2">
@@ -760,9 +780,7 @@ function BreakpointStoryboard({ breakpoints, selected, currentTime, onCardClick 
               </div>
 
               {/* Reason — 2-line truncated */}
-              {bp.reason && (
-                <p className="text-[11px] text-muted-foreground/80 leading-relaxed line-clamp-2 mb-2">{bp.reason}</p>
-              )}
+              <p className="text-[11px] text-muted-foreground/80 leading-relaxed line-clamp-2 mb-2">{bp.reason || "AI analysis pending"}</p>
 
               {/* Compliance Notes */}
               {bp.compliance_notes && (
@@ -940,7 +958,17 @@ const VALLEY_EMOJI_DESCRIPTIONS: Record<string, { emoji: string; description: st
 };
 
 function ConfidenceBar({ value }: { value: number | null }) {
-  if (value === null) return null;
+  if (value === null) return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-muted-foreground">Confidence</span>
+        <span className="text-sm font-bold text-muted-foreground">—</span>
+      </div>
+      <div className="h-2 w-full rounded-full bg-surface-0/80 overflow-hidden">
+        <div className="h-full rounded-full bg-muted/40" style={{ width: "0%" }} />
+      </div>
+    </div>
+  );
   const pct = Math.round(value * 100);
   const barColor = value >= 0.85 ? "bg-emerald-500" : value >= 0.65 ? "bg-amber-500" : "bg-red-500";
   const textColor = value >= 0.85 ? "text-emerald-400" : value >= 0.65 ? "text-amber-400" : "text-red-400";
@@ -1033,13 +1061,52 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
 }
 
 function ConfidenceRow({ value }: { value: number | null }) {
-  if (value === null) return null;
+  if (value === null) return (<div className="flex justify-between"><span className="text-muted-foreground">Confidence</span><span className="font-semibold text-muted-foreground">—</span></div>);
   const pct = value * 100;
   return (<div className="flex justify-between"><span className="text-muted-foreground">Confidence</span><span className={`font-semibold ${confidenceColor(value)}`}>{pct.toFixed(1)}%</span></div>);
 }
 
 function ReasonBox({ title, text }: { title: string; text: string }) {
   return (<div className="mt-2 p-3 rounded-xl bg-surface-0/60 border border-border/20"><p className="text-[10px] font-medium text-accent mb-1 uppercase tracking-wide">{title}</p><p className="text-[11px] text-muted-foreground leading-relaxed">{text}</p></div>);
+}
+
+// ─── Results Error Boundary ─────────────────────────────────────────────────
+
+class ResultsErrorBoundary extends React.Component<
+  { children: React.ReactNode; onRetry: () => void },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode; onRetry: () => void }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error("[ResultsErrorBoundary]", error, info.componentStack);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center px-6 py-20 max-w-xl mx-auto animate-fade-in">
+          <div className="glass-panel rounded-2xl p-6 text-center">
+            <AlertCircle className="h-8 w-8 text-destructive mx-auto mb-3" />
+            <h2 className="text-lg font-bold text-foreground mb-2">Something went wrong</h2>
+            <p className="text-sm text-muted-foreground mb-2">An unexpected error occurred while rendering results.</p>
+            {this.state.error && (
+              <p className="text-xs text-muted-foreground/60 font-mono bg-surface-0/60 rounded-lg p-3 mb-4 break-all">{this.state.error.message}</p>
+            )}
+            <div className="flex gap-2 justify-center">
+              <Button variant="ghost" size="sm" className="text-xs" onClick={this.props.onRetry}>← Back</Button>
+              <Button size="sm" className="text-xs" onClick={() => { this.setState({ hasError: false, error: null }); }}>Try Again</Button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -1143,6 +1210,22 @@ const Results = () => {
     fetchAll();
   }, [projectId]);
 
+  // Re-fetch presigned video URL (for expired URLs)
+  const refreshVideoUrl = useCallback(async () => {
+    if (!projectId) return;
+    setVideoError(false);
+    try {
+      const { data } = await supabase.functions.invoke("get-video-url", { body: { project_id: projectId } });
+      if (data?.url) {
+        setVideoUrl(data.url);
+      } else {
+        setVideoError(true);
+      }
+    } catch {
+      setVideoError(true);
+    }
+  }, [projectId]);
+
   const duration = useMemo(() => {
     if (totalDuration > 0) return totalDuration;
     if (segments.length === 0) return 600;
@@ -1175,24 +1258,30 @@ const Results = () => {
   }, [breakpoints, exportApprovedOnly]);
 
   const handleExportJSON = useCallback(() => {
-    const data = {
-      project_id: projectId,
-      title: projectInfo.title,
-      content_type: projectInfo.content_type,
-      delivery_target: projectInfo.delivery_target,
-      duration_sec: projectInfo.duration_sec,
-      generated_at: new Date().toISOString(),
-      export_filter: exportApprovedOnly ? "approved_only" : "all",
-      segments,
-      breakpoints: exportBreakpoints.map((bp) => ({
-        ...bp,
-        approval_status: bp.approval_status || "pending",
-        boundary_reasons: bp.boundary_reasons || [],
-      })),
-      highlights,
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `storybreak-${projectId}.json`; a.click(); URL.revokeObjectURL(url);
+    try {
+      const data = {
+        project_id: projectId,
+        title: projectInfo.title,
+        content_type: projectInfo.content_type,
+        delivery_target: projectInfo.delivery_target,
+        duration_sec: projectInfo.duration_sec,
+        generated_at: new Date().toISOString(),
+        export_filter: exportApprovedOnly ? "approved_only" : "all",
+        segments,
+        breakpoints: exportBreakpoints.map((bp) => ({
+          ...bp,
+          approval_status: bp.approval_status || "pending",
+          boundary_reasons: bp.boundary_reasons || [],
+        })),
+        highlights,
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `storybreak-${projectId}.json`; a.click(); URL.revokeObjectURL(url);
+      toast({ title: "Analysis exported successfully", description: "Full analysis JSON downloaded." });
+    } catch (err: any) {
+      console.error("[Export JSON]", err);
+      toast({ title: "Export failed", description: err?.message || "Could not generate JSON export.", variant: "destructive" });
+    }
   }, [segments, exportBreakpoints, highlights, projectId, projectInfo, exportApprovedOnly]);
 
   
@@ -1205,30 +1294,40 @@ const Results = () => {
   }, []);
 
   const handleDownloadMasterPackage = useCallback(() => {
-    const safeTitle = (projectInfo.title || "StoryBreak-Export").replace(/[^a-zA-Z0-9_-]/g, "_");
-    const title = projectInfo.title || "StoryBreak Export";
-    const dur = projectInfo.duration_sec || 0;
+    try {
+      const safeTitle = (projectInfo.title || "StoryBreak-Export").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const title = projectInfo.title || "StoryBreak Export";
+      const dur = projectInfo.duration_sec || 0;
 
-    downloadFile(generateEDL(exportBreakpoints, title), `${safeTitle}-breakpoints.edl`);
-    setTimeout(() => downloadFile(generateFCPXML(exportBreakpoints, segments, title, dur), `${safeTitle}-breakpoints.fcpxml`, "application/xml"), 300);
-    setTimeout(() => downloadFile(generatePremiereXML(exportBreakpoints, segments, title, dur), `${safeTitle}-breakpoints-premiere.xml`, "application/xml"), 600);
-    setTimeout(() => {
-      downloadFile(JSON.stringify(generateOTTManifest(exportBreakpoints, projectId || "", projectInfo), null, 2), `${safeTitle}-ott-manifest.json`, "application/json");
-      toast({ title: "NLE Package exported", description: `${exportApprovedOnly ? "Approved" : "All"} breakpoints exported as EDL, FCP XML, Premiere XML, and OTT Manifest.` });
-    }, 900);
+      downloadFile(generateEDL(exportBreakpoints, title), `${safeTitle}-breakpoints.edl`);
+      setTimeout(() => downloadFile(generateFCPXML(exportBreakpoints, segments, title, dur), `${safeTitle}-breakpoints.fcpxml`, "application/xml"), 300);
+      setTimeout(() => downloadFile(generatePremiereXML(exportBreakpoints, segments, title, dur), `${safeTitle}-breakpoints-premiere.xml`, "application/xml"), 600);
+      setTimeout(() => {
+        downloadFile(JSON.stringify(generateOTTManifest(exportBreakpoints, projectId || "", projectInfo), null, 2), `${safeTitle}-ott-manifest.json`, "application/json");
+        toast({ title: "EDL + OTT package downloaded", description: `${exportApprovedOnly ? "Approved" : "All"} breakpoints exported as EDL, FCP XML, Premiere XML, and OTT Manifest.` });
+      }, 900);
+    } catch (err: any) {
+      console.error("[Export NLE Package]", err);
+      toast({ title: "Export failed", description: err?.message || "Could not generate NLE package.", variant: "destructive" });
+    }
   }, [exportBreakpoints, segments, projectInfo, projectId, downloadFile, exportApprovedOnly]);
 
   const handleDownloadFormat = useCallback((fmt: "edl" | "fcpxml" | "premiere" | "ott") => {
-    const safeTitle = (projectInfo.title || "StoryBreak-Export").replace(/[^a-zA-Z0-9_-]/g, "_");
-    const title = projectInfo.title || "StoryBreak Export";
-    const dur = projectInfo.duration_sec || 0;
-    switch (fmt) {
-      case "edl": downloadFile(generateEDL(exportBreakpoints, title), `${safeTitle}-breakpoints.edl`); break;
-      case "fcpxml": downloadFile(generateFCPXML(exportBreakpoints, segments, title, dur), `${safeTitle}-breakpoints.fcpxml`, "application/xml"); break;
-      case "premiere": downloadFile(generatePremiereXML(exportBreakpoints, segments, title, dur), `${safeTitle}-breakpoints-premiere.xml`, "application/xml"); break;
-      case "ott": downloadFile(JSON.stringify(generateOTTManifest(exportBreakpoints, projectId || "", projectInfo), null, 2), `${safeTitle}-ott-manifest.json`, "application/json"); break;
+    try {
+      const safeTitle = (projectInfo.title || "StoryBreak-Export").replace(/[^a-zA-Z0-9_-]/g, "_");
+      const title = projectInfo.title || "StoryBreak Export";
+      const dur = projectInfo.duration_sec || 0;
+      switch (fmt) {
+        case "edl": downloadFile(generateEDL(exportBreakpoints, title), `${safeTitle}-breakpoints.edl`); break;
+        case "fcpxml": downloadFile(generateFCPXML(exportBreakpoints, segments, title, dur), `${safeTitle}-breakpoints.fcpxml`, "application/xml"); break;
+        case "premiere": downloadFile(generatePremiereXML(exportBreakpoints, segments, title, dur), `${safeTitle}-breakpoints-premiere.xml`, "application/xml"); break;
+        case "ott": downloadFile(JSON.stringify(generateOTTManifest(exportBreakpoints, projectId || "", projectInfo), null, 2), `${safeTitle}-ott-manifest.json`, "application/json"); break;
+      }
+      toast({ title: `${fmt.toUpperCase()} exported`, description: `${exportApprovedOnly ? "Approved" : "All"} breakpoints exported.` });
+    } catch (err: any) {
+      console.error(`[Export ${fmt}]`, err);
+      toast({ title: "Export failed", description: err?.message || `Could not generate ${fmt.toUpperCase()} export.`, variant: "destructive" });
     }
-    toast({ title: `${fmt.toUpperCase()} exported`, description: `${exportApprovedOnly ? "Approved" : "All"} breakpoints exported.` });
   }, [exportBreakpoints, segments, projectInfo, projectId, downloadFile, exportApprovedOnly]);
 
   // Compute readiness states from loaded data
@@ -1257,12 +1356,13 @@ const Results = () => {
     if (!projectId) return;
     setReAnalyzing(true);
     try {
-      // 1. Delete stale derived rows
+      // 1. Delete stale derived rows (including analysis_logs)
       const deletes = await Promise.all([
         supabase.from("analysis_chunks").delete().eq("project_id", projectId),
         supabase.from("segments").delete().eq("project_id", projectId),
         supabase.from("breakpoints").delete().eq("project_id", projectId),
         supabase.from("highlights").delete().eq("project_id", projectId),
+        supabase.from("analysis_logs").delete().eq("project_id", projectId),
       ]);
       const delErr = deletes.find((d) => d.error);
       if (delErr?.error) throw new Error(`Cleanup failed: ${delErr.error.message}`);
@@ -1321,6 +1421,7 @@ const Results = () => {
   }
 
   return (
+    <ResultsErrorBoundary onRetry={() => navigate("/")}>
     <div className="flex flex-col px-4 py-4 max-w-[1400px] mx-auto gap-4 animate-fade-in">
       {/* Solution Statement Banner */}
       <SolutionBanner />
@@ -1347,8 +1448,8 @@ const Results = () => {
               videoError ? (
                 <div className="aspect-video bg-surface-0 flex flex-col items-center justify-center gap-3">
                   <AlertCircle className="h-6 w-6 text-destructive/60" />
-                  <p className="text-xs text-muted-foreground">Video unavailable</p>
-                  <Button variant="outline" size="sm" className="text-xs rounded-lg gap-1.5" onClick={() => { setVideoError(false); setVideoUrl(videoUrl); }}>
+                  <p className="text-xs text-muted-foreground">Video unavailable — click to retry</p>
+                  <Button variant="outline" size="sm" className="text-xs rounded-lg gap-1.5" onClick={refreshVideoUrl}>
                     <RefreshCw className="h-3 w-3" /> Retry
                   </Button>
                 </div>
@@ -1502,7 +1603,7 @@ const Results = () => {
                 <Button variant="ghost" size="sm" onClick={() => setReAnalyzeOpen(false)}>
                   Cancel
                 </Button>
-                <Button size="sm" className="gap-1.5" onClick={() => setReAnalyzeConfirm(true)} disabled={!reAnalyzeChanged}>
+                <Button size="sm" className="gap-1.5" onClick={() => setReAnalyzeConfirm(true)}>
                   <RefreshCw className="h-3.5 w-3.5" />
                   Start Re-Analysis
                 </Button>
@@ -1540,6 +1641,7 @@ const Results = () => {
         </DialogContent>
       </Dialog>
     </div>
+    </ResultsErrorBoundary>
   );
 };
 

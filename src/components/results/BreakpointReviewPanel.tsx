@@ -345,15 +345,15 @@ export function BreakpointReviewPanel({
                 <Badge variant="outline" className={`text-[9px] ${cfg.bg} ${cfg.color} border`}>
                   <StatusIcon className="h-2.5 w-2.5 mr-0.5" /> {cfg.label}
                 </Badge>
-                {confPct !== null && (
-                  <Badge variant="outline" className={`text-[9px] ${
-                    confPct >= 85 ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                    : confPct >= 65 ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
-                    : "bg-destructive/10 border-destructive/20 text-destructive"
-                  }`}>
-                    {confPct}%
-                  </Badge>
-                )}
+                <Badge variant="outline" className={`text-[9px] ${
+                  confPct === null ? "bg-muted/30 border-muted/30 text-muted-foreground"
+                  : confPct >= 85 ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                  : confPct >= 65 ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
+                  : confPct === 0 ? "bg-destructive/10 border-destructive/20 text-destructive"
+                  : "bg-destructive/10 border-destructive/20 text-destructive"
+                }`}>
+                  {confPct !== null ? `${confPct}%` : "—"}
+                </Badge>
                 <div className="flex-1" />
                 <ValleyIcon className={`h-3 w-3 ${
                   bp.valley_type === "dialogue_pause" ? "text-blue-400"
@@ -364,9 +364,7 @@ export function BreakpointReviewPanel({
               </div>
 
               {/* Reason */}
-              {bp.reason && (
-                <p className="text-[10px] text-muted-foreground leading-relaxed mb-2 line-clamp-2">{bp.reason}</p>
-              )}
+              <p className="text-[10px] text-muted-foreground leading-relaxed mb-2 line-clamp-2">{bp.reason || "AI analysis pending"}</p>
 
               {/* Boundary reason chips */}
               {bp.boundary_reasons && bp.boundary_reasons.length > 0 && (
