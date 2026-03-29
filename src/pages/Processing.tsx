@@ -380,7 +380,7 @@ const Processing = () => {
                     {/* Indeterminate shimmer bar when no chunk data yet */}
                     {!(step.key === "analyzing" && chunkProgress && chunkProgress.total > 0) && (
                       <div className="w-full h-1.5 rounded-full bg-surface-2/60 overflow-hidden">
-                        <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-blue-500/40 via-blue-400 to-blue-500/40 animate-[shimmer_2s_ease-in-out_infinite]" />
+                        <div className="h-full w-1/4 rounded-full bg-gradient-to-r from-primary/20 via-primary to-primary/20 animate-[slide-progress_2s_ease-in-out_infinite]" />
                       </div>
                     )}
 
