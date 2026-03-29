@@ -70,7 +70,7 @@ const Index = () => {
       setError("Failed to load sample video.");
       setLoadingSample(false);
     }
-  }, [navigate]);
+  }, [navigate, deliveryTarget]);
 
   const validateAndUpload = useCallback(async (file: File) => {
     setError(null);
