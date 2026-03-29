@@ -1075,9 +1075,9 @@ function DemoResults() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] px-6">
       <Sparkles className="h-10 w-10 text-primary/40 mb-4" />
-      <h1 className="text-xl font-bold text-foreground mb-2">No Project Selected</h1>
-      <p className="text-sm text-muted-foreground mb-6">Upload a video to see AI analysis results here.</p>
-      <Button className="rounded-xl glow-blue btn-hover" onClick={() => navigate("/")}>Upload Video</Button>
+      <h1 className="text-xl font-bold text-foreground mb-2">Nothing here yet!</h1>
+      <p className="text-sm text-muted-foreground mb-6">Upload a video and we'll show your AI analysis results right here.</p>
+      <Button className="rounded-xl glow-blue btn-hover" onClick={() => navigate("/")}>Let's Get Started</Button>
     </div>
   );
 }
