@@ -790,8 +790,20 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, onDownlo
             <FileJson className="h-3.5 w-3.5" /> Export Full Analysis (JSON)
           </Button>
           <Button variant="outline" size="sm" className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover" onClick={onDownloadMasterPackage} disabled={readiness.edl !== "ready"}>
-            <Package className="h-3.5 w-3.5" /> Get EDL + OTT Package
+            <Package className="h-3.5 w-3.5" /> Download NLE Package
           </Button>
+          <div className="grid grid-cols-2 gap-1.5 mt-1">
+            {([
+              { fmt: "edl" as const, label: "EDL" },
+              { fmt: "fcpxml" as const, label: "FCP XML" },
+              { fmt: "premiere" as const, label: "Premiere" },
+              { fmt: "ott" as const, label: "OTT JSON" },
+            ]).map(({ fmt, label }) => (
+              <Button key={fmt} variant="ghost" size="sm" className="text-[10px] h-6 px-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-surface-1/60" onClick={() => onDownloadFormat(fmt)} disabled={readiness.edl !== "ready"}>
+                {label}
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
