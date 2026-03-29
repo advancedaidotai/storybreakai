@@ -613,7 +613,7 @@ function BreakpointStoryboard({ breakpoints, selected, currentTime, onCardClick 
           const isActive = activeCardId === bp.id;
           const valley = VALLEY_CONFIG[bp.valley_type || ""] || VALLEY_CONFIG.scene_transition;
           const ValleyIcon = valley.icon;
-          const confNorm = bp.confidence !== null ? (bp.confidence! > 1 ? bp.confidence! / 100 : bp.confidence) : null;
+          const confNorm = bp.confidence;
 
           // Confidence badge color
           const confBadgeBg = confNorm === null ? "bg-muted/30"
