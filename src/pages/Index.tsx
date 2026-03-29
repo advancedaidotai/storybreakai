@@ -185,8 +185,8 @@ const Index = () => {
     setError("Upload cancelled.");
   }, []);
 
-  // Validate video URL
-  const handleLoadVideoUrl = useCallback(async () => {
+  // Validate video URL (syntax only — backend will verify access)
+  const handleLoadVideoUrl = useCallback(() => {
     const trimmed = videoUrl.trim();
     if (!trimmed) {
       setUrlError("Please enter a video URL");
@@ -196,25 +196,9 @@ const Index = () => {
       setUrlError("That doesn't look like a valid video URL. Please check and try again.");
       return;
     }
-    setUrlValidating(true);
     setUrlError(null);
-    setUrlValid(false);
-
-    try {
-      // Try a HEAD request to verify the URL is accessible
-      const response = await fetch(trimmed, { method: "HEAD", mode: "no-cors" });
-      // no-cors won't give us status, but if it doesn't throw, the URL is likely reachable
-      setUrlValid(true);
-      setUrlError(null);
-      toast({ title: "Video URL loaded!", description: "Your video link is ready for analysis." });
-    } catch {
-      // Even if HEAD fails due to CORS, we still accept the URL - the backend will fetch it
-      setUrlValid(true);
-      setUrlError(null);
-      toast({ title: "Video URL accepted", description: "We'll verify access when analysis starts." });
-    } finally {
-      setUrlValidating(false);
-    }
+    setUrlValid(true);
+    toast({ title: "Video URL accepted", description: "We'll verify access when analysis starts." });
   }, [videoUrl]);
 
   const uploadMultipart = useCallback(async (file: File, projectId: string) => {
