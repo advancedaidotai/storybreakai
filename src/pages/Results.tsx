@@ -1422,7 +1422,20 @@ const Results = () => {
         />
       </div>
 
-      {/* Timeline */}
+      {/* Breakpoint Review Panel */}
+      <div className="fade-in-600 fade-in-delay-2">
+        <BreakpointReviewPanel
+          breakpoints={breakpoints}
+          projectId={projectId || ""}
+          contentType={projectInfo.content_type}
+          deliveryTarget={projectInfo.delivery_target}
+          segments={segments}
+          onBreakpointUpdated={handleBreakpointUpdated}
+          onSelectBreakpoint={handleSelectBreakpoint}
+          selectedBreakpointId={selected?.kind === "breakpoint" ? selected.data.id : null}
+        />
+      </div>
+
       <div className="fade-in-600 fade-in-delay-3">
         <Timeline
           segments={segments} breakpoints={breakpoints} highlights={highlights}
