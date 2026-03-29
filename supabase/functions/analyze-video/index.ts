@@ -268,6 +268,28 @@ All timestamps in seconds. Return ONLY valid JSON with keys: segments, breakpoin
 
 // ─── Bedrock call with response parsing ──────────────────────────────────────
 
+let cachedAwsAccountId: string | null = null;
+
+async function getAwsAccountId(accessKeyId: string, secretAccessKey: string, region: string): Promise<string> {
+  if (cachedAwsAccountId) return cachedAwsAccountId;
+
+  const stsClient = new STSClient({
+    region,
+    credentials: {
+      accessKeyId,
+      secretAccessKey,
+    },
+  });
+
+  const identity = await stsClient.send(new GetCallerIdentityCommand({}));
+  if (!identity.Account) {
+    throw new Error("Unable to resolve AWS account ID for Bedrock mediaSource.s3Location.bucketOwner");
+  }
+
+  cachedAwsAccountId = identity.Account;
+  return cachedAwsAccountId;
+}
+
 async function callPegasus(
   prompt: string,
   projectId: string,
@@ -276,6 +298,12 @@ async function callPegasus(
   const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY")!;
   const awsSecretKey = Deno.env.get("AWS_SECRET_KEY")!;
   const bedrockRegion = Deno.env.get("BEDROCK_REGION") || "us-east-1";
+
+  if (!s3Uri.startsWith("s3://")) {
+    throw new Error(`Pegasus requires an s3:// video URI, received: ${s3Uri.slice(0, 120)}`);
+  }
+
+  const awsAccountId = await getAwsAccountId(awsAccessKey, awsSecretKey, bedrockRegion);
 
   const bedrockClient = new BedrockRuntimeClient({
     region: bedrockRegion,
@@ -297,6 +325,7 @@ async function callPegasus(
           mediaSource: {
             s3Location: {
               uri: s3Uri,
+              bucketOwner: awsAccountId,
             },
           },
           maxOutputTokens: 4096,
