@@ -53,7 +53,7 @@ async function signedBedrockRequest(params: {
   const { region, accessKey, secretKey, modelId, body } = params;
   const service = "bedrock";
   const host = `bedrock-runtime.${region}.amazonaws.com`;
-  const path = `/model/${encodeURIComponent(modelId)}/invoke`;
+  const path = `/model/${modelId}/invoke`;
   const url = `https://${host}${path}`;
   const payload = JSON.stringify(body);
   const payloadBytes = new TextEncoder().encode(payload);
