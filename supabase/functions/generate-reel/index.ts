@@ -215,13 +215,11 @@ Deno.serve(async (req) => {
 
     console.log(`[generate-reel] Trimming ${highlights.length} clips for project ${projectId}`);
 
-    // 3) Trim each highlight clip — skip failures gracefully
-    const trimmedUrls: string[] = [];
+    // 3) Trim all highlight clips in parallel — failures drop gracefully
+    console.log(`[generate-reel] Trimming ${highlights.length} clips in parallel for project ${projectId}`);
 
-    for (const hl of highlights) {
-      if (Date.now() >= pipelineDeadline) throw new Error("Reel generation timed out");
-
-      try {
+    const trimResults = await Promise.allSettled(
+      highlights.map(async (hl: any) => {
         console.log(`[generate-reel] Trimming highlight ${hl.id}: ${hl.start_sec}s → ${hl.end_sec}s`);
         const result = await falRun("fal-ai/workflow-utilities/trim-video", {
           video_url: videoUrl,
@@ -229,17 +227,25 @@ Deno.serve(async (req) => {
           end_time: Number(hl.end_sec),
         }, falApiKey, pipelineDeadline);
 
-        if (result?.video?.url) {
-          trimmedUrls.push(result.video.url);
-          console.log(`[generate-reel] Trimmed clip ready: ${result.video.url.slice(0, 80)}...`);
-        } else {
-          console.warn(`[generate-reel] Trim returned no video URL for highlight ${hl.id}, skipping`);
+        if (!result?.video?.url) {
+          throw new Error(`No video URL returned for highlight ${hl.id}`);
         }
-      } catch (trimErr: any) {
-        console.error(`[generate-reel] Trim failed for highlight ${hl.id} (${hl.start_sec}s-${hl.end_sec}s), skipping: ${trimErr.message}`);
-        // Continue with remaining clips
-      }
-    }
+        console.log(`[generate-reel] Trimmed clip ready: ${result.video.url.slice(0, 80)}...`);
+        return { url: result.video.url, start_sec: Number(hl.start_sec) };
+      })
+    );
+
+    // Collect successful clips in chronological order
+    const trimmedClips = trimResults
+      .map((r, i) => {
+        if (r.status === "fulfilled") return r.value;
+        console.error(`[generate-reel] Trim failed for highlight ${highlights[i].id}, skipping: ${(r as PromiseRejectedResult).reason?.message}`);
+        return null;
+      })
+      .filter(Boolean) as { url: string; start_sec: number }[];
+
+    trimmedClips.sort((a, b) => a.start_sec - b.start_sec);
+    const trimmedUrls = trimmedClips.map((c) => c.url);
 
     if (trimmedUrls.length === 0) {
       throw new Error("All clip trims failed — no clips available for reel");
