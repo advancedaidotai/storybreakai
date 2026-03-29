@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Check, Loader2, AlertCircle, RefreshCw, CloudUpload, Brain, Layers, Sparkles, Film } from "lucide-react";
+import { Check, Loader2, AlertCircle, RefreshCw, CloudUpload, Brain, Layers, Sparkles, Film, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
@@ -71,7 +71,14 @@ const Processing = () => {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [scenesFound, setScenesFound] = useState(0);
   const [thumbTimestamps, setThumbTimestamps] = useState<number[]>([]);
+  const [elapsedSec, setElapsedSec] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Track elapsed time for timeout warnings
+  useEffect(() => {
+    const timer = setInterval(() => setElapsedSec((s) => s + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Poll project status + chunk progress + metadata
   useEffect(() => {
@@ -253,6 +260,20 @@ const Processing = () => {
 
       <h1 className="text-2xl font-bold tracking-tight text-foreground">Working some magic ✨</h1>
       <p className="text-muted-foreground mt-2 text-center text-sm">Our AI is watching your video and mapping every scene, arc, and highlight. This usually takes a few minutes.</p>
+
+      {/* Timeout warnings */}
+      {elapsedSec >= 600 && !isFailed && (
+        <div className="w-full max-w-sm mt-4 p-3 rounded-xl border border-destructive/30 bg-destructive/10 text-sm text-destructive flex items-start gap-2">
+          <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>Analysis may have stalled. Try refreshing or starting over.</span>
+        </div>
+      )}
+      {elapsedSec >= 300 && elapsedSec < 600 && !isFailed && (
+        <div className="w-full max-w-sm mt-4 p-3 rounded-xl border border-amber-500/30 bg-amber-500/10 text-sm text-amber-400 flex items-start gap-2">
+          <Clock className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>This is taking longer than expected. Analysis of longer videos may take up to 15 minutes.</span>
+        </div>
+      )}
 
       {/* Stepper */}
       <div className="mt-10 w-full max-w-sm space-y-0">
