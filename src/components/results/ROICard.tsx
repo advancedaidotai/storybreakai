@@ -48,6 +48,9 @@ export function ROICard({ durationSec, contentType, deliveryTarget }: ROICardPro
           </div>
         ))}
       </div>
+      <div className="px-5 pb-1">
+        <p className="text-[9px] text-muted-foreground/40 text-center italic">Illustrative estimates · not calculated from your data</p>
+      </div>
       {/* Active Compliance Engine */}
       <div className="px-5 pb-4 pt-1">
         <div className="flex items-center gap-2 pt-3 border-t border-border/15">
