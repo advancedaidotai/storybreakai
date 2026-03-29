@@ -62,17 +62,21 @@ function getVideoDuration(file: File): Promise<number> {
 }
 
 function isValidVideoUrl(url: string): boolean {
+  const trimmed = url.trim();
+
+  // Accept s3:// and gs:// URIs directly
+  if (/^(s3|gs):\/\/.+/i.test(trimmed)) return true;
+
   try {
-    const parsed = new URL(url);
+    const parsed = new URL(trimmed);
     if (!["http:", "https:"].includes(parsed.protocol)) return false;
     const lower = parsed.pathname.toLowerCase();
     if (VIDEO_URL_EXTENSIONS.some((ext) => lower.endsWith(ext))) return true;
-    // Allow known video hosts
+    // Allow known video/cloud hosts (S3, GCS, Azure, CloudFront, JWPlayer)
     const host = parsed.hostname.toLowerCase();
     if (["s3.amazonaws.com", "storage.googleapis.com", "blob.core.windows.net", "cloudfront.net", "cdn.jwplayer.com"].some((h) => host.includes(h))) return true;
-    // Allow any URL with video-related query params
     if (parsed.searchParams.has("video") || parsed.searchParams.has("v")) return true;
-    // Be permissive - allow any https URL (user responsibility)
+    // Be permissive - allow any https URL
     return parsed.protocol === "https:";
   } catch {
     return false;
