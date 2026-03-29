@@ -867,6 +867,10 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, onDownlo
       {/* Export Actions */}
       <div className="border-t border-border/20 pt-4 mt-auto">
         <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">Get Your Results</h3>
+        <label className="flex items-center gap-2 mb-2.5 cursor-pointer group">
+          <input type="checkbox" checked={exportApprovedOnly} onChange={onToggleApprovedOnly} className="rounded border-border/40 bg-surface-0 text-primary focus:ring-primary/30 h-3.5 w-3.5" />
+          <span className="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors">Export approved breakpoints only</span>
+        </label>
         <div className="flex flex-col gap-2">
           <Button variant="outline" size="sm" className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover" onClick={onExportJSON} disabled={readiness.analysis !== "ready"}>
             <FileJson className="h-3.5 w-3.5" /> Export Full Analysis (JSON)
