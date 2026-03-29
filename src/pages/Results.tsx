@@ -680,8 +680,8 @@ function BreakpointStoryboard({ breakpoints, selected, currentTime, onCardClick 
 
 // ─── Detail Panel ────────────────────────────────────────────────────────────
 
-function DetailPanel({ selected, onExportJSON, onDownloadReel, onDownloadMasterPackage, reelUrl }: {
-  selected: SelectedItem | null; onExportJSON: () => void; onDownloadReel: () => void; onDownloadMasterPackage: () => void; reelUrl: string | null;
+function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage }: {
+  selected: SelectedItem | null; onExportJSON: () => void; onDownloadMasterPackage: () => void;
 }) {
   return (
     <div className="glass-panel rounded-2xl p-4 flex flex-col gap-4 h-fit lg:sticky lg:top-16 overflow-auto">
@@ -708,7 +708,6 @@ function DetailPanel({ selected, onExportJSON, onDownloadReel, onDownloadMasterP
         <div className="flex flex-col gap-2">
           <Button variant="outline" size="sm" className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover" onClick={onExportJSON}><FileJson className="h-3.5 w-3.5" /> Export JSON</Button>
           <Button variant="outline" size="sm" className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover" onClick={onDownloadMasterPackage}><Package className="h-3.5 w-3.5" /> Download Master Package</Button>
-          <Button size="sm" className="w-full gap-2 rounded-xl text-xs h-8 glow-blue btn-hover" onClick={onDownloadReel} disabled={!reelUrl}><Download className="h-3.5 w-3.5" /> Download Reel</Button>
         </div>
       </div>
     </div>
