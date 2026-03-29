@@ -833,13 +833,22 @@ const Results = () => {
   const handleDownloadReel = useCallback(() => { if (reelUrl) window.open(reelUrl, "_blank"); }, [reelUrl]);
 
   const handleDownloadMasterPackage = useCallback(() => {
+    const safeTitle = (projectInfo.title || "StoryBreak-Export").replace(/[^a-zA-Z0-9_-]/g, "_");
     const edl = generateEDL(breakpoints, projectInfo.title || "StoryBreak Export");
-    const ott = generateOTTManifest(breakpoints, projectId || "");
+    const ott = generateOTTManifest(breakpoints, projectId || "", projectInfo);
+
     const edlBlob = new Blob([edl], { type: "text/plain" });
     const ottBlob = new Blob([JSON.stringify(ott, null, 2)], { type: "application/json" });
-    const edlUrl = URL.createObjectURL(edlBlob); const edlA = document.createElement("a"); edlA.href = edlUrl; edlA.download = `storybreak-${projectId}.edl`; edlA.click(); URL.revokeObjectURL(edlUrl);
-    setTimeout(() => { const ottUrl = URL.createObjectURL(ottBlob); const ottA = document.createElement("a"); ottA.href = ottUrl; ottA.download = `storybreak-${projectId}-ott-manifest.json`; ottA.click(); URL.revokeObjectURL(ottUrl); }, 200);
-  }, [breakpoints, projectInfo.title, projectId]);
+
+    const edlUrl = URL.createObjectURL(edlBlob);
+    const edlA = document.createElement("a"); edlA.href = edlUrl; edlA.download = `${safeTitle}-breakpoints.edl`; edlA.click(); URL.revokeObjectURL(edlUrl);
+
+    setTimeout(() => {
+      const ottUrl = URL.createObjectURL(ottBlob);
+      const ottA = document.createElement("a"); ottA.href = ottUrl; ottA.download = `${safeTitle}-ott-manifest.json`; ottA.click(); URL.revokeObjectURL(ottUrl);
+      toast({ title: "Master Package exported", description: "EDL + OTT Manifest downloaded successfully." });
+    }, 300);
+  }, [breakpoints, projectInfo, projectId]);
 
   if (!projectId) return <DemoResults />;
 
