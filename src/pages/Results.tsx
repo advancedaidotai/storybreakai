@@ -126,7 +126,7 @@ function generateOTTManifest(breakpoints: Breakpoint[], projectId: string, proje
     generated_at: new Date().toISOString(),
     content_id: projectId,
     content_title: projectInfo.title || "Untitled",
-    delivery_target: projectInfo.delivery_target || "broadcast",
+    delivery_target: projectInfo.delivery_target || "ott",
     total_duration_sec: projectInfo.duration_sec || 0,
     ad_breaks: breakpoints.map((bp, i) => ({
       ad_slot_id: `${projectId}_slot_${i + 1}`,
@@ -1155,7 +1155,7 @@ const Results = () => {
       {/* Win Strategy Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 fade-in-600">
         <ROICard durationSec={projectInfo.duration_sec} contentType={projectInfo.content_type} deliveryTarget={projectInfo.delivery_target} />
-        <ComplianceCard deliveryTarget={projectInfo.delivery_target} />
+        <ComplianceCard deliveryTarget={projectInfo.delivery_target} breakpoints={breakpoints} totalDuration={totalDuration || projectInfo.duration_sec} />
         <SimilarContent />
       </div>
     </div>
