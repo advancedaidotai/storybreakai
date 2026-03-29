@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useRef, useCallback } from "react";
-import { CloudUpload, Film, AlertCircle, X, Loader2, Tv, Clapperboard, XCircle, Check } from "lucide-react";
+import { CloudUpload, Film, AlertCircle, X, Loader2, Tv, Clapperboard, XCircle, Check, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,6 +57,30 @@ interface UploadProgress {
   startTime: number;
 }
 
+/* ── Step badge ─────────────────────────────────── */
+function StepBadge({ n }: { n: number }) {
+  return (
+    <span className="inline-flex items-center justify-center h-6 w-6 rounded-full text-[11px] font-bold text-primary-foreground shrink-0" style={{ background: "hsl(217 91% 55%)" }}>
+      {n}
+    </span>
+  );
+}
+
+/* ── Labelled input ─────────────────────────────── */
+function LabelledInput({ label, required, ...props }: { label: string; required?: boolean } & React.ComponentProps<typeof Input>) {
+  return (
+    <div>
+      <label className="block text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/70 mb-1.5">
+        {label}{required && <span className="text-destructive ml-0.5">*</span>}
+      </label>
+      <Input
+        {...props}
+        className="bg-[hsl(220_25%_8%)] border border-border/20 rounded-lg px-3 h-10 text-sm text-foreground placeholder:text-muted-foreground/40 focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:border-primary/40 transition-colors"
+      />
+    </div>
+  );
+}
+
 const Index = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -68,11 +92,9 @@ const Index = () => {
   const [fileSize, setFileSize] = useState(0);
   const [contentType, setContentType] = useState<ContentType>("feature_film");
 
-  // Feature Film fields
   const [filmTitle, setFilmTitle] = useState("");
   const [studio, setStudio] = useState("");
 
-  // TV Episode fields
   const [showTitle, setShowTitle] = useState("");
   const [season, setSeason] = useState("1");
   const [episodeNum, setEpisodeNum] = useState("1");
@@ -251,7 +273,7 @@ const Index = () => {
       setError(err?.message || "Upload failed. Please try again.");
       setUploadState("idle");
     }
-  }, [selectedFile, formValid, config, contentType, filmTitle, studio, showTitle, season, episodeNum, episodeTitle, tvStudio, navigate, uploadMultipart, uploadSinglePut]);
+  }, [selectedFile, formValid, config, contentType, filmTitle, studio, showTitle, season, episodeNum, episodeTitle, tvStudio, deliveryTarget, navigate, uploadMultipart, uploadSinglePut]);
 
   const handleFileSelect = useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -267,266 +289,277 @@ const Index = () => {
 
   const isBusy = uploadState !== "idle";
 
+  const panelStyle = "rounded-xl border border-border/15";
+  const panelBg = "hsl(222 25% 11%)";
+
   return (
-    <div className="flex flex-col items-center justify-center min-h-[calc(100vh-3rem)] px-6 py-12">
-      {/* Brand */}
-      <div className="flex items-center gap-2.5 mb-2">
-        <div className="h-8 w-8 rounded-xl bg-primary/15 flex items-center justify-center">
-          <Film className="h-4.5 w-4.5 text-primary" />
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Story<span className="text-primary">Break</span>
-          <span className="text-muted-foreground font-normal ml-1.5">AI</span>
-        </h1>
+    <div className="p-8 max-w-[1200px] mx-auto">
+      {/* Page Header */}
+      <div className="mb-8">
+        <h2 className="text-xl font-bold text-foreground tracking-tight">New Intelligence Analysis</h2>
+        <p className="text-sm text-muted-foreground mt-1">Configure your video parameters for deep act-structure detection.</p>
       </div>
-      <p className="text-sm text-muted-foreground text-center max-w-md leading-relaxed mb-10">
-        AI-powered ad-break intelligence for video content
-      </p>
 
-      <div className="w-full max-w-lg space-y-6">
-        {/* Content Type Cards */}
-        <div className="grid grid-cols-2 gap-3">
-          {([
-            { type: "feature_film" as ContentType, icon: Clapperboard, label: "Feature Film", sub: "60–180 min" },
-            { type: "tv_episode" as ContentType, icon: Tv, label: "TV Episode", sub: "15–60 min" },
-          ]).map(({ type, icon: Icon, label, sub }) => {
-            const selected = contentType === type;
-            return (
-              <button
-                key={type}
-                onClick={() => { setContentType(type); setTouched(false); }}
-                disabled={isBusy}
-                className={`relative flex flex-col items-center gap-2.5 py-6 px-4 rounded-2xl border transition-all duration-300 cursor-pointer group ${
-                  selected
-                    ? "border-primary/60 bg-primary/[0.06] shadow-[0_0_24px_-6px_hsl(217_91%_60%/0.25)]"
-                    : "border-border/30 bg-surface-1/40 hover:border-border/50 hover:bg-surface-1/60"
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                {selected && (
-                  <div className="absolute top-3 right-3 h-5 w-5 rounded-full bg-primary flex items-center justify-center">
-                    <Check className="h-3 w-3 text-primary-foreground" />
-                  </div>
-                )}
-                <div className={`h-11 w-11 rounded-xl flex items-center justify-center transition-colors duration-300 ${
-                  selected ? "bg-primary/20" : "bg-surface-2/80 group-hover:bg-surface-3/80"
-                }`}>
-                  <Icon className={`h-5.5 w-5.5 transition-colors duration-300 ${selected ? "text-primary" : "text-muted-foreground/70"}`} />
-                </div>
-                <div className="text-center">
-                  <p className={`text-sm font-semibold transition-colors duration-300 ${selected ? "text-foreground" : "text-foreground/80"}`}>{label}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+      <div className="flex gap-8">
+        {/* ═══════════════════════════════════════════ LEFT COLUMN ═══ */}
+        <div className="flex-[3] min-w-0 space-y-6">
 
-        {/* Metadata Fields */}
-        <div className="rounded-2xl bg-surface-1/50 border border-border/20 p-5 space-y-4">
-          {contentType === "feature_film" ? (
-            <div className="space-y-4 animate-[fade-in_300ms_ease-out]" key="film-fields">
-              <div>
-                <Input
-                  value={filmTitle}
-                  onChange={(e) => setFilmTitle(e.target.value)}
-                  placeholder="Film Title *"
-                  className="bg-transparent border-0 border-b border-border/30 rounded-none px-0 h-10 text-sm placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:border-primary/60 transition-colors"
-                />
-                {touched && !filmTitle.trim() && (
-                  <p className="text-[11px] text-destructive mt-1.5">Film title is required</p>
-                )}
-              </div>
-              <Input
-                value={studio}
-                onChange={(e) => setStudio(e.target.value)}
-                placeholder="Studio — e.g. Warner Bros, A24, Netflix"
-                className="bg-transparent border-0 border-b border-border/30 rounded-none px-0 h-10 text-sm placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:border-primary/60 transition-colors"
-              />
+          {/* Step 1 — Content Type */}
+          <div className={`${panelStyle} p-5`} style={{ backgroundColor: panelBg }}>
+            <div className="flex items-center gap-2.5 mb-4">
+              <StepBadge n={1} />
+              <h3 className="text-sm font-semibold text-foreground">Content Type Selection</h3>
             </div>
-          ) : (
-            <div className="space-y-4 animate-[fade-in_300ms_ease-out]" key="tv-fields">
-              <div>
-                <Input
-                  value={showTitle}
-                  onChange={(e) => setShowTitle(e.target.value)}
-                  placeholder="Show Title *"
-                  className="bg-transparent border-0 border-b border-border/30 rounded-none px-0 h-10 text-sm placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:border-primary/60 transition-colors"
-                />
-                {touched && !showTitle.trim() && (
-                  <p className="text-[11px] text-destructive mt-1.5">Show title is required</p>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <Input
-                  type="number"
-                  min={1}
-                  value={season}
-                  onChange={(e) => setSeason(e.target.value)}
-                  placeholder="Season"
-                  className="bg-transparent border-0 border-b border-border/30 rounded-none px-0 h-10 text-sm placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:border-primary/60 transition-colors"
-                />
-                <Input
-                  type="number"
-                  min={1}
-                  value={episodeNum}
-                  onChange={(e) => setEpisodeNum(e.target.value)}
-                  placeholder="Episode #"
-                  className="bg-transparent border-0 border-b border-border/30 rounded-none px-0 h-10 text-sm placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:border-primary/60 transition-colors"
-                />
-              </div>
-              <Input
-                value={episodeTitle}
-                onChange={(e) => setEpisodeTitle(e.target.value)}
-                placeholder="Episode Title — e.g. Ozymandias"
-                className="bg-transparent border-0 border-b border-border/30 rounded-none px-0 h-10 text-sm placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:border-primary/60 transition-colors"
-              />
-              <Input
-                value={tvStudio}
-                onChange={(e) => setTvStudio(e.target.value)}
-                placeholder="Studio — e.g. HBO, Netflix, AMC"
-                className="bg-transparent border-0 border-b border-border/30 rounded-none px-0 h-10 text-sm placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:border-primary/60 transition-colors"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              {([
+                { type: "feature_film" as ContentType, icon: Clapperboard, label: "Feature Film", sub: "60–180 min" },
+                { type: "tv_episode" as ContentType, icon: Tv, label: "TV Episode", sub: "15–60 min" },
+              ]).map(({ type, icon: Icon, label, sub }) => {
+                const selected = contentType === type;
+                return (
+                  <button
+                    key={type}
+                    onClick={() => { setContentType(type); setTouched(false); }}
+                    disabled={isBusy}
+                    className={`relative flex flex-col items-center gap-2.5 py-5 px-4 rounded-xl border transition-all duration-300 cursor-pointer group ${
+                      selected
+                        ? "border-primary/60 bg-primary/[0.06] shadow-[0_0_24px_-6px_hsl(217_91%_60%/0.25)]"
+                        : "border-border/20 bg-surface-1/30 hover:border-border/40 hover:bg-surface-1/50"
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  >
+                    {selected && (
+                      <div className="absolute top-2.5 right-2.5 h-5 w-5 rounded-full bg-primary flex items-center justify-center">
+                        <Check className="h-3 w-3 text-primary-foreground" />
+                      </div>
+                    )}
+                    <div className={`h-10 w-10 rounded-xl flex items-center justify-center transition-colors duration-300 ${
+                      selected ? "bg-primary/20" : "bg-surface-2/80 group-hover:bg-surface-3/80"
+                    }`}>
+                      <Icon className={`h-5 w-5 transition-colors duration-300 ${selected ? "text-primary" : "text-muted-foreground/70"}`} />
+                    </div>
+                    <div className="text-center">
+                      <p className={`text-sm font-semibold transition-colors ${selected ? "text-foreground" : "text-foreground/80"}`}>{label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* Delivery Target */}
-        <div>
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground/60 mb-2 ml-0.5">Delivery Target</p>
-          <select
-            value={deliveryTarget}
-            onChange={(e) => setDeliveryTarget(e.target.value)}
-            disabled={isBusy}
-            className="w-full bg-transparent border-0 border-b border-border/30 rounded-none px-0 h-10 text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary/60 transition-colors disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0 center' }}
-          >
-            <option value="broadcast">Broadcast / Master · Act structures</option>
-            <option value="cable_vod">Cable / VOD · 8-12 min intervals</option>
-            <option value="youtube">YouTube · 3-5 min intervals</option>
-          </select>
-        </div>
+          {/* Step 2 — Metadata */}
+          <div className={`${panelStyle} p-5`} style={{ backgroundColor: panelBg }}>
+            <div className="flex items-center gap-2.5 mb-4">
+              <StepBadge n={2} />
+              <h3 className="text-sm font-semibold text-foreground">Metadata Intelligence</h3>
+            </div>
 
-        {/* Drop Zone — compact */}
-        <div
-          className={`relative w-full rounded-2xl overflow-hidden cursor-pointer glass-panel-elevated cinematic-shadow transition-all duration-500 ${
-            isDragOver ? "border-primary/60 glow-blue scale-[1.01]" : "border-border/30 hover:border-primary/30"
-          } ${isBusy ? "pointer-events-none" : ""}`}
-          style={{ height: selectedFile && !isBusy ? "auto" : undefined }}
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => !isBusy && fileInputRef.current?.click()}
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(217_91%_60%/0.04),transparent_70%)]" />
-
-          <div className="relative flex flex-col items-center justify-center gap-3 z-10 py-8 px-6">
-            {uploadState === "uploading" ? (
-              <div className="text-center w-full max-w-xs space-y-4">
-                <div className="relative mx-auto w-20 h-20">
-                  <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
-                    <circle cx="40" cy="40" r="35" fill="none" stroke="hsl(var(--surface-2))" strokeWidth="3.5" />
-                    <circle cx="40" cy="40" r="35" fill="none" stroke="hsl(var(--primary))" strokeWidth="3.5" strokeLinecap="round"
-                      strokeDasharray={`${2 * Math.PI * 35}`}
-                      strokeDashoffset={`${2 * Math.PI * 35 * (1 - pct / 100)}`}
-                      className="transition-all duration-300"
-                    />
-                  </svg>
-                  <span className="absolute inset-0 flex items-center justify-center text-base font-bold text-primary font-mono">{pct}%</span>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground truncate">{fileName}</p>
-                  <p className="text-[11px] text-muted-foreground/60 mt-0.5">{formatSize(fileSize)}</p>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">Speed</p>
-                    <p className="text-xs font-mono text-foreground">{formatSpeed(speed)}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">Parts</p>
-                    <p className="text-xs font-mono text-foreground">{progress.completedParts} / {progress.totalParts}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">ETA</p>
-                    <p className="text-xs font-mono text-foreground">{remaining > 0 ? formatEta(remaining) : "—"}</p>
-                  </div>
-                </div>
-                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-destructive pointer-events-auto" onClick={(e) => { e.stopPropagation(); handleCancel(); }}>
-                  <XCircle className="h-3.5 w-3.5 mr-1.5" /> Cancel
-                </Button>
-              </div>
-            ) : uploadState === "requesting" || uploadState === "validating" ? (
-              <>
-                <div className="h-12 w-12 rounded-xl bg-primary/20 flex items-center justify-center">
-                  <Loader2 className="h-6 w-6 text-primary animate-spin" />
-                </div>
-                <p className="font-medium text-sm text-primary">{uploadState === "validating" ? "Validating video…" : "Preparing upload…"}</p>
-              </>
-            ) : selectedFile ? (
-              <div className="flex items-center gap-3 w-full">
-                <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
-                  <Film className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-foreground truncate">{selectedFile.name}</p>
-                  <p className="text-xs text-muted-foreground">{formatSize(selectedFile.size)}</p>
-                </div>
-                <button
-                  onClick={(e) => { e.stopPropagation(); setSelectedFile(null); setFileName(""); setFileSize(0); }}
-                  className="shrink-0 h-8 w-8 rounded-lg bg-surface-2/60 flex items-center justify-center hover:bg-destructive/20 hover:text-destructive transition-colors"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
+            {contentType === "feature_film" ? (
+              <div className="space-y-4 animate-[fade-in_300ms_ease-out]" key="film">
+                <LabelledInput label="Film Title" required value={filmTitle} onChange={(e) => setFilmTitle(e.target.value)} placeholder="e.g. Inception" />
+                {touched && !filmTitle.trim() && <p className="text-[11px] text-destructive -mt-2">Film title is required</p>}
+                <LabelledInput label="Studio / Network" value={studio} onChange={(e) => setStudio(e.target.value)} placeholder="e.g. Warner Bros, A24, Netflix" />
               </div>
             ) : (
-              <>
-                <div className={`h-12 w-12 rounded-xl flex items-center justify-center transition-all duration-500 ${isDragOver ? "bg-primary/20 glow-blue scale-110" : "bg-surface-2/80"}`}>
-                  <CloudUpload className={`h-6 w-6 transition-colors duration-300 ${isDragOver ? "text-primary" : "text-muted-foreground/60"}`} />
+              <div className="space-y-4 animate-[fade-in_300ms_ease-out]" key="tv">
+                <LabelledInput label="Show Title" required value={showTitle} onChange={(e) => setShowTitle(e.target.value)} placeholder="e.g. Breaking Bad" />
+                {touched && !showTitle.trim() && <p className="text-[11px] text-destructive -mt-2">Show title is required</p>}
+                <div className="grid grid-cols-2 gap-4">
+                  <LabelledInput label="Season" type="number" min={1} value={season} onChange={(e) => setSeason(e.target.value)} placeholder="01" />
+                  <LabelledInput label="Episode" type="number" min={1} value={episodeNum} onChange={(e) => setEpisodeNum(e.target.value)} placeholder="12" />
                 </div>
-                <div className="text-center">
-                  <p className={`text-sm font-medium transition-colors duration-300 ${isDragOver ? "text-primary" : "text-foreground"}`}>
-                    {isDragOver ? "Release to select" : "Drop your video here"}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    MP4 or MOV · Max {config.durationLabel} · Up to {config.sizeLabel}
-                  </p>
-                </div>
-              </>
+                <LabelledInput label="Episode Title" value={episodeTitle} onChange={(e) => setEpisodeTitle(e.target.value)} placeholder="Chapter 4: The Revelation" />
+                <LabelledInput label="Studio / Network" value={tvStudio} onChange={(e) => setTvStudio(e.target.value)} placeholder="Lumina Productions" />
+              </div>
             )}
           </div>
 
-          <input ref={fileInputRef} type="file" className="hidden" accept=".mp4,.mov,video/mp4,video/quicktime" onChange={(e) => handleFileSelect(e.target.files)} />
+          {/* Step 3 — Delivery Target */}
+          <div className={`${panelStyle} p-5`} style={{ backgroundColor: panelBg }}>
+            <div className="flex items-center gap-2.5 mb-4">
+              <StepBadge n={3} />
+              <h3 className="text-sm font-semibold text-foreground">Analysis Engine Configuration</h3>
+            </div>
+            <div>
+              <label className="block text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground/70 mb-1.5">Delivery Target</label>
+              <select
+                value={deliveryTarget}
+                onChange={(e) => setDeliveryTarget(e.target.value)}
+                disabled={isBusy}
+                className="w-full bg-[hsl(220_25%_8%)] border border-border/20 rounded-lg px-3 h-10 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed appearance-none cursor-pointer"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center' }}
+              >
+                <option value="broadcast">Broadcast / Master · Act structures</option>
+                <option value="cable_vod">Cable / VOD · 8-12 min intervals</option>
+                <option value="youtube">YouTube · 3-5 min intervals</option>
+              </select>
+            </div>
+          </div>
         </div>
 
-        {/* Error */}
-        {error && (
-          <div className="flex items-start gap-3 p-3.5 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive">
-            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-            <p className="text-xs leading-relaxed flex-1">{error}</p>
-            <button onClick={() => setError(null)} className="shrink-0 hover:opacity-70 transition-opacity"><X className="h-3.5 w-3.5" /></button>
+        {/* ═══════════════════════════════════════════ RIGHT COLUMN ═══ */}
+        <div className="flex-[2] min-w-0">
+          <div className="sticky top-16 space-y-4">
+
+            {/* Step 4 — Video Source */}
+            <div className={`${panelStyle} p-5`} style={{ backgroundColor: panelBg }}>
+              <div className="flex items-center gap-2.5 mb-4">
+                <StepBadge n={4} />
+                <h3 className="text-sm font-semibold text-foreground">Video Source</h3>
+              </div>
+
+              {/* Drop Zone */}
+              <div
+                className={`relative w-full rounded-xl overflow-hidden cursor-pointer border transition-all duration-300 ${
+                  isDragOver ? "border-primary/60 glow-blue" : "border-border/20 hover:border-primary/30"
+                } ${isBusy ? "pointer-events-none" : ""}`}
+                style={{ backgroundColor: "hsl(220 25% 8%)" }}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => !isBusy && fileInputRef.current?.click()}
+              >
+                <div className="relative flex flex-col items-center justify-center gap-3 z-10 py-8 px-5">
+                  {uploadState === "uploading" ? (
+                    <div className="text-center w-full max-w-xs space-y-4">
+                      <div className="relative mx-auto w-20 h-20">
+                        <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+                          <circle cx="40" cy="40" r="35" fill="none" stroke="hsl(var(--surface-2))" strokeWidth="3.5" />
+                          <circle cx="40" cy="40" r="35" fill="none" stroke="hsl(var(--primary))" strokeWidth="3.5" strokeLinecap="round"
+                            strokeDasharray={`${2 * Math.PI * 35}`}
+                            strokeDashoffset={`${2 * Math.PI * 35 * (1 - pct / 100)}`}
+                            className="transition-all duration-300"
+                          />
+                        </svg>
+                        <span className="absolute inset-0 flex items-center justify-center text-base font-bold text-primary font-mono">{pct}%</span>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground truncate">{fileName}</p>
+                        <p className="text-[11px] text-muted-foreground/60 mt-0.5">{formatSize(fileSize)}</p>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div>
+                          <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">Speed</p>
+                          <p className="text-xs font-mono text-foreground">{formatSpeed(speed)}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">Parts</p>
+                          <p className="text-xs font-mono text-foreground">{progress.completedParts} / {progress.totalParts}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-muted-foreground/50 uppercase tracking-wider">ETA</p>
+                          <p className="text-xs font-mono text-foreground">{remaining > 0 ? formatEta(remaining) : "—"}</p>
+                        </div>
+                      </div>
+                      <Button variant="ghost" size="sm" className="text-xs text-muted-foreground hover:text-destructive pointer-events-auto" onClick={(e) => { e.stopPropagation(); handleCancel(); }}>
+                        <XCircle className="h-3.5 w-3.5 mr-1.5" /> Cancel
+                      </Button>
+                    </div>
+                  ) : uploadState === "requesting" || uploadState === "validating" ? (
+                    <>
+                      <div className="h-11 w-11 rounded-xl bg-primary/20 flex items-center justify-center">
+                        <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                      </div>
+                      <p className="font-medium text-sm text-primary">{uploadState === "validating" ? "Validating video…" : "Preparing upload…"}</p>
+                    </>
+                  ) : selectedFile ? (
+                    <div className="flex items-center gap-3 w-full">
+                      <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+                        <Film className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{selectedFile.name}</p>
+                        <p className="text-xs text-muted-foreground">{formatSize(selectedFile.size)}</p>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setSelectedFile(null); setFileName(""); setFileSize(0); }}
+                        className="shrink-0 h-8 w-8 rounded-lg bg-surface-2/60 flex items-center justify-center hover:bg-destructive/20 hover:text-destructive transition-colors"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className={`h-11 w-11 rounded-xl flex items-center justify-center transition-all duration-500 ${isDragOver ? "bg-primary/20 scale-110" : "bg-surface-2/80"}`}>
+                        <CloudUpload className={`h-5 w-5 transition-colors duration-300 ${isDragOver ? "text-primary" : "text-muted-foreground/60"}`} />
+                      </div>
+                      <div className="text-center">
+                        <p className={`text-sm font-medium transition-colors ${isDragOver ? "text-primary" : "text-foreground"}`}>
+                          {isDragOver ? "Release to select" : "Drop your video files here"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Support for MP4, MOV, and ProRES masters up to {config.sizeLabel}
+                        </p>
+                      </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                        className="mt-1 px-4 py-1.5 text-xs font-medium border border-border/30 rounded-lg text-muted-foreground hover:text-foreground hover:border-border/50 transition-colors"
+                      >
+                        Browse Files
+                      </button>
+                    </>
+                  )}
+                </div>
+                <input ref={fileInputRef} type="file" className="hidden" accept=".mp4,.mov,video/mp4,video/quicktime" onChange={(e) => handleFileSelect(e.target.files)} />
+              </div>
+            </div>
+
+            {/* Info card */}
+            <div className={`${panelStyle} p-4 flex items-center justify-between`} style={{ backgroundColor: panelBg }}>
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60">Estimated Analysis Time</p>
+                <p className="text-sm font-semibold text-foreground mt-0.5">~14 Minutes</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground/60">Credits Required</p>
+                <p className="text-sm font-semibold text-foreground mt-0.5">4.2 Units</p>
+              </div>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="flex items-start gap-3 p-3.5 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive">
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <p className="text-xs leading-relaxed flex-1">{error}</p>
+                <button onClick={() => setError(null)} className="shrink-0 hover:opacity-70 transition-opacity"><X className="h-3.5 w-3.5" /></button>
+              </div>
+            )}
+
+            {/* Upload button */}
+            <Button
+              size="lg"
+              className="w-full rounded-xl h-12 text-sm font-semibold btn-hover disabled:opacity-40 disabled:shadow-none"
+              style={{ background: formValid && !isBusy ? "linear-gradient(135deg, hsl(187 92% 42%), hsl(217 91% 55%))" : undefined }}
+              disabled={!formValid || isBusy}
+              onClick={() => { setTouched(true); if (formValid) handleUpload(); }}
+            >
+              {isBusy ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Processing…</>
+              ) : (
+                <><CloudUpload className="h-4 w-4 mr-2" /> Upload & Analyze</>
+              )}
+            </Button>
+
+            <p className="text-[10px] text-muted-foreground/40 text-center leading-relaxed">
+              By clicking, you agree to our Content Security Policy for secure media processing.
+            </p>
+
+            {/* AI Tip */}
+            <div className={`${panelStyle} p-4 border-l-2`} style={{ backgroundColor: panelBg, borderLeftColor: "hsl(263 70% 50%)" }}>
+              <div className="flex items-start gap-2.5">
+                <Sparkles className="h-4 w-4 shrink-0 mt-0.5" style={{ color: "hsl(263 70% 60%)" }} />
+                <div>
+                  <p className="text-[11px] font-semibold text-foreground/80 mb-1">AI Tip</p>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Feature films take longer to analyze as our engine builds a semantic map of every scene to detect character arcs automatically.
+                  </p>
+                </div>
+              </div>
+            </div>
+
           </div>
-        )}
-
-        {/* Upload Button */}
-        <Button
-          size="lg"
-          className="w-full rounded-xl h-12 text-sm font-semibold glow-blue btn-hover disabled:opacity-40 disabled:shadow-none"
-          disabled={!formValid || isBusy}
-          onClick={() => { setTouched(true); if (formValid) handleUpload(); }}
-        >
-          {isBusy ? (
-            <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Processing…</>
-          ) : (
-            <>
-              <CloudUpload className="h-4 w-4 mr-2" /> Upload & Analyze
-            </>
-          )}
-        </Button>
+        </div>
       </div>
-
-      <footer className="absolute bottom-6 text-center text-[10px] text-muted-foreground/40">
-        StoryBreak AI v0.1 · Powered by <span className="text-primary/50">MineYourMedia</span>
-      </footer>
     </div>
   );
 };
