@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      analysis_chunks: {
+        Row: {
+          chunk_index: number
+          created_at: string
+          end_sec: number
+          id: string
+          overlap_end_sec: number | null
+          overlap_start_sec: number | null
+          pegasus_response: Json | null
+          project_id: string
+          start_sec: number
+          status: Database["public"]["Enums"]["chunk_status"]
+        }
+        Insert: {
+          chunk_index: number
+          created_at?: string
+          end_sec: number
+          id?: string
+          overlap_end_sec?: number | null
+          overlap_start_sec?: number | null
+          pegasus_response?: Json | null
+          project_id: string
+          start_sec: number
+          status?: Database["public"]["Enums"]["chunk_status"]
+        }
+        Update: {
+          chunk_index?: number
+          created_at?: string
+          end_sec?: number
+          id?: string
+          overlap_end_sec?: number | null
+          overlap_start_sec?: number | null
+          pegasus_response?: Json | null
+          project_id?: string
+          start_sec?: number
+          status?: Database["public"]["Enums"]["chunk_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analysis_chunks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       breakpoints: {
         Row: {
           ad_slot_duration_rec: number | null
@@ -248,6 +295,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
+      chunk_status: "pending" | "analyzing" | "complete" | "failed"
       content_type: "short_form" | "tv_episode" | "feature_film"
       export_type: "json" | "reel"
       project_status:
@@ -393,6 +441,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      chunk_status: ["pending", "analyzing", "complete", "failed"],
       content_type: ["short_form", "tv_episode", "feature_film"],
       export_type: ["json", "reel"],
       project_status: [
