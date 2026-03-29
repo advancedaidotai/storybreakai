@@ -125,6 +125,7 @@ const Index = () => {
           content_type: file.type || "video/mp4",
           file_size: file.size,
           duration_sec: Math.round(duration),
+          delivery_target: deliveryTarget,
         },
       });
 
