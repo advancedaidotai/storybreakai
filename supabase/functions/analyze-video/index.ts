@@ -417,12 +417,13 @@ function calculateChunks(durationSec: number): { start_sec: number; end_sec: num
   let start = 0;
   while (start < durationSec) {
     const end = Math.min(start + CHUNK_DURATION, durationSec);
+    if (end <= start) break;
     const overlapStart = start > 0 ? start : null;
     const overlapEnd = start > 0 ? Math.min(start + OVERLAP_DURATION, end) : null;
     chunks.push({ start_sec: start, end_sec: end, overlap_start_sec: overlapStart, overlap_end_sec: overlapEnd });
+    if (end >= durationSec) break;
     start = end - OVERLAP_DURATION;
     if (start >= durationSec) break;
-    if (end >= durationSec) break;
   }
   return chunks;
 }
