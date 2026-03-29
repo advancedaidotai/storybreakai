@@ -333,22 +333,59 @@ async function callPegasus(
     });
 
     const response = await bedrockClient.send(command);
-    const responseBody = new TextDecoder().decode(response.body);
-    bedrockData = JSON.parse(responseBody);
+
+    // Decode Uint8Array response body
+    let rawBodyString: string;
+    if (response.body instanceof Uint8Array) {
+      rawBodyString = new TextDecoder().decode(response.body);
+    } else if (response.body && typeof (response.body as any).transformToString === "function") {
+      rawBodyString = await (response.body as any).transformToString();
+    } else {
+      rawBodyString = String(response.body);
+    }
+
+    console.log(`[analyze-video] Raw Bedrock response body (first 2000 chars): ${rawBodyString.slice(0, 2000)}`);
+
+    try {
+      bedrockData = JSON.parse(rawBodyString);
+      console.log(`[analyze-video] Parsed Bedrock envelope JSON keys: ${Object.keys(bedrockData)}`);
+    } catch (parseErr: any) {
+      console.error(`[analyze-video] Failed to parse Bedrock envelope as JSON: ${parseErr.message}`);
+      console.log(`[analyze-video] Full raw body: ${rawBodyString}`);
+      throw new Error(`Bedrock response is not valid JSON: ${parseErr.message}`);
+    }
   } catch (err: any) {
     throw new Error(`Bedrock SDK invoke failed: ${err?.message || "Unknown Bedrock error"}`);
   }
 
   let responseText: string;
-  if (bedrockData?.results?.[0]?.outputText) responseText = bedrockData.results[0].outputText;
-  else if (bedrockData?.output?.text) responseText = bedrockData.output.text;
-  else if (typeof bedrockData?.outputText === "string") responseText = bedrockData.outputText;
-  else if (typeof bedrockData?.body === "string") responseText = bedrockData.body;
-  else responseText = JSON.stringify(bedrockData);
+  if (bedrockData?.results?.[0]?.outputText) {
+    responseText = bedrockData.results[0].outputText;
+    console.log(`[analyze-video] Extracted text from results[0].outputText`);
+  } else if (bedrockData?.output?.text) {
+    responseText = bedrockData.output.text;
+    console.log(`[analyze-video] Extracted text from output.text`);
+  } else if (typeof bedrockData?.outputText === "string") {
+    responseText = bedrockData.outputText;
+    console.log(`[analyze-video] Extracted text from outputText`);
+  } else if (typeof bedrockData?.body === "string") {
+    responseText = bedrockData.body;
+    console.log(`[analyze-video] Extracted text from body`);
+  } else {
+    responseText = JSON.stringify(bedrockData);
+    console.log(`[analyze-video] No known text field found, using full JSON as responseText`);
+  }
 
   console.log(`[analyze-video] Raw response length: ${responseText.length}`);
+  console.log(`[analyze-video] Raw response text (first 3000 chars): ${responseText.slice(0, 3000)}`);
+
+  console.log(`[analyze-video] Extracting JSON...`);
   const rawJSON = extractJSON(responseText);
-  return validateAndClean(rawJSON, projectId);
+  console.log(`[analyze-video] Parsed JSON keys: ${Object.keys(rawJSON as Record<string, unknown>)}`);
+
+  const { result, logs } = validateAndClean(rawJSON, projectId);
+  console.log(`[analyze-video] Validated: ${result.segments.length} segments, ${result.breakpoints.length} breakpoints, ${result.highlights.length} highlights`);
+  return { result, logs };
 }
 
 // ─── Single-pass insert ──────────────────────────────────────────────────────
