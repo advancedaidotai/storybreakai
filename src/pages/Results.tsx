@@ -732,7 +732,7 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, readines
       <div>
         <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">{selected ? "What We Found" : "Tap to Explore"}</h3>
         {!selected ? (
-          <p className="text-xs text-muted-foreground/60 leading-relaxed">Click any segment, breakpoint, or highlight on the timeline to inspect it.</p>
+          <p className="text-xs text-muted-foreground/60 leading-relaxed">Click any segment, breakpoint, or highlight on the timeline above to see the details.</p>
         ) : selected.kind === "segment" ? (
           <div className="animate-fade-in"><SegmentDetail seg={selected.data} /></div>
         ) : selected.kind === "breakpoint" ? (
