@@ -922,11 +922,12 @@ const Results = () => {
           </div>
         </div>
 
-        {/* Highlight Reel */}
-        <div className="glass-panel rounded-2xl overflow-hidden glow-blue cinematic-shadow fade-in-600 fade-in-delay-2">
-          <div className="relative">
-            {reelUrl ? <video src={reelUrl} className="w-full aspect-video bg-primary/[0.02] object-contain" controls preload="metadata" /> : <div className="aspect-video bg-primary/[0.02] flex items-center justify-center"><Sparkles className="h-6 w-6 text-primary/40" /></div>}
-            <Badge className="absolute top-2 left-2 text-[10px] bg-accent/90 text-accent-foreground border-0 pointer-events-none">AI Highlight Reel</Badge>
+        {/* Analysis Summary Panel */}
+        <div className="glass-panel rounded-2xl overflow-hidden cinematic-shadow fade-in-600 fade-in-delay-2">
+          <div className="aspect-video bg-primary/[0.02] flex flex-col items-center justify-center gap-3 p-6">
+            <Sparkles className="h-8 w-8 text-primary/40" />
+            <p className="text-sm font-semibold text-foreground">Analysis Complete</p>
+            <p className="text-xs text-muted-foreground text-center">{segments.length} segments · {breakpoints.length} breakpoints · {highlights.length} highlights detected</p>
           </div>
         </div>
 
