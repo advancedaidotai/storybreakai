@@ -283,7 +283,7 @@ Deno.serve(async (req) => {
     if (!useMultiPass) {
       // ── SINGLE-PASS ──────────────────────────────────────────────
       console.log(`[analyze-video] SINGLE-PASS for project ${projectId} (${durationSec}s, ${contentType})`);
-      const prompt = buildPrompt({ s3Uri: video.s3_uri, deliveryLabel, contentType });
+      const prompt = buildPrompt({ s3Uri: video.s3_uri, deliveryLabel, deliveryTarget, contentType });
       const analysis = await callPegasus(prompt);
       console.log(`[analyze-video] Parsed: ${analysis.segments.length} segments, ${analysis.breakpoints.length} breakpoints, ${analysis.highlights.length} highlights`);
       await insertResults(supabase, projectId, analysis);
