@@ -799,7 +799,7 @@ const Results = () => {
           supabase.from("segments").select("*").eq("project_id", projectId).order("start_sec"),
           supabase.from("breakpoints").select("*").eq("project_id", projectId).order("timestamp_sec"),
           supabase.from("highlights").select("*").eq("project_id", projectId).order("score", { ascending: false }),
-          supabase.from("exports").select("file_url").eq("project_id", projectId).eq("type", "reel").order("created_at", { ascending: false }).limit(1),
+          supabase.from("analysis_chunks").select("id, chunk_index, start_sec, end_sec, overlap_start_sec, overlap_end_sec").eq("project_id", projectId).order("chunk_index"),
           supabase.from("analysis_chunks").select("id, chunk_index, start_sec, end_sec, overlap_start_sec, overlap_end_sec").eq("project_id", projectId).order("chunk_index"),
         ]);
 
