@@ -82,7 +82,7 @@ function mergeBreakpoints(chunks: ChunkData[]): Breakpoint[] {
 
     for (const bp of chunk.pegasus_response.breakpoints) {
       const absTimestamp = bp.timestamp_sec + offsetStart;
-      const absLeadIn = bp.lead_in_sec != null ? bp.lead_in_sec + offsetStart : null;
+      const absLeadIn = bp.lead_in_sec != null ? bp.lead_in_sec : null; // lead_in_sec is a duration, not a timestamp — no offset needed
 
       // De-duplicate: if a breakpoint within 30s already exists with higher confidence, skip
       const existing = allBps.find((b) => Math.abs(b.timestamp_sec - absTimestamp) < 30);
@@ -155,8 +155,8 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     projectId = body.project_id;
-    if (!projectId) {
-      return new Response(JSON.stringify({ error: "project_id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!projectId || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
+      return new Response(JSON.stringify({ error: "Invalid project ID format" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     // Fetch all completed chunks

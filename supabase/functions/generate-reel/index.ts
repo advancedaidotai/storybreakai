@@ -154,8 +154,8 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     projectId = body.project_id;
-
-    if (!projectId || typeof projectId !== "string") {
+    if (!projectId || typeof projectId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(projectId)) {
+      return new Response(JSON.stringify({ error: "Invalid project ID format" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       return new Response(JSON.stringify({ error: "project_id is required" }), {
         status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
