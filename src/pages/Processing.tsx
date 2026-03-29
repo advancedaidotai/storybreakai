@@ -247,7 +247,7 @@ const Processing = () => {
       )}
 
       <div className="flex items-center justify-center w-full max-w-sm mt-12">
-        <Button variant="ghost" size="sm" className="text-xs h-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => navigate("/")}>← New Analysis</Button>
+        <Button variant="ghost" size="sm" className="text-xs h-8 rounded-lg text-muted-foreground hover:text-foreground" onClick={() => navigate("/")}>← Start Over</Button>
       </div>
     </div>
   );
