@@ -13,7 +13,7 @@ export function TopNav() {
             <span className="text-muted-foreground font-normal ml-1">AI</span>
           </h1>
           <p className="text-[9px] font-semibold tracking-[0.2em] uppercase" style={{ color: "hsl(187 92% 50%)" }}>
-            POWERED BY MINEYOURMEDIA
+            POWERED BY MOVIEMACHINE.AI
           </p>
         </div>
       </a>
