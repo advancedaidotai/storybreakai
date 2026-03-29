@@ -7,6 +7,13 @@ import {
   Clock, Shield, Timer, Minus, Plus, ChevronLeft, ChevronRight,
   List, Diamond, MonitorPlay, Clapperboard, AlertCircle, CheckCircle2, XCircle, Ban, RefreshCw,
 } from "lucide-react";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
@@ -15,7 +22,6 @@ import { SolutionBanner } from "@/components/results/SolutionBanner";
 import { ROICard } from "@/components/results/ROICard";
 import { ComplianceCard } from "@/components/results/ComplianceCard";
 import { SimilarContent } from "@/components/results/SimilarContent";
-import { BusinessCaseButton } from "@/components/results/BusinessCasePDF";
 import { AdBreakStoryboard } from "@/components/results/AdBreakStoryboard";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -955,6 +961,18 @@ const Results = () => {
   const [chunks, setChunks] = useState<AnalysisChunk[]>([]);
   const [currentTime, setCurrentTime] = useState(0);
 
+  // Re-Analyze modal state
+  const [reAnalyzeOpen, setReAnalyzeOpen] = useState(false);
+  const [reDeliveryTarget, setReDeliveryTarget] = useState("");
+  const [reContentType, setReContentType] = useState("");
+  const [reAnalyzing, setReAnalyzing] = useState(false);
+
+  // Sync modal defaults when project loads
+  useEffect(() => {
+    setReDeliveryTarget(projectInfo.delivery_target || "ott");
+    setReContentType(projectInfo.content_type || "short_form");
+  }, [projectInfo.delivery_target, projectInfo.content_type]);
+
   // Track video playback position
   useEffect(() => {
     const vid = videoRef.current;
@@ -1082,6 +1100,44 @@ const Results = () => {
     navigate(`/processing/${projectId}`);
   }, [projectId, navigate]);
 
+  const reAnalyzeChanged = reDeliveryTarget !== (projectInfo.delivery_target || "ott") || reContentType !== (projectInfo.content_type || "short_form");
+
+  const handleReAnalyze = useCallback(async () => {
+    if (!projectId) return;
+    setReAnalyzing(true);
+    try {
+      // 1. Delete stale derived rows
+      const deletes = await Promise.all([
+        supabase.from("analysis_chunks").delete().eq("project_id", projectId),
+        supabase.from("segments").delete().eq("project_id", projectId),
+        supabase.from("breakpoints").delete().eq("project_id", projectId),
+        supabase.from("highlights").delete().eq("project_id", projectId),
+      ]);
+      const delErr = deletes.find((d) => d.error);
+      if (delErr?.error) throw new Error(`Cleanup failed: ${delErr.error.message}`);
+
+      // 2. Update project with new settings + reset status
+      const { error: updateErr } = await supabase
+        .from("projects")
+        .update({
+          delivery_target: reDeliveryTarget,
+          content_type: reContentType as any,
+          status: "uploaded" as any,
+        })
+        .eq("id", projectId);
+      if (updateErr) throw new Error(`Update failed: ${updateErr.message}`);
+
+      toast({ title: "Re-analyzing with new settings…", description: "Redirecting to processing." });
+      setReAnalyzeOpen(false);
+      navigate(`/processing/${projectId}`);
+    } catch (err: any) {
+      console.error("[ReAnalyze]", err);
+      toast({ title: "Re-analysis failed", description: err?.message || "Please try again.", variant: "destructive" });
+    } finally {
+      setReAnalyzing(false);
+    }
+  }, [projectId, reDeliveryTarget, reContentType, navigate]);
+
   if (!projectId) return <DemoResults />;
 
   if (fetchError && !loading && segments.length === 0 && breakpoints.length === 0) {
@@ -1124,15 +1180,9 @@ const Results = () => {
           <ContentHeader project={projectInfo} segments={segments} breakpoints={breakpoints} highlights={highlights} />
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <BusinessCaseButton
-            projectTitle={projectInfo.title}
-            contentType={projectInfo.content_type}
-            deliveryTarget={projectInfo.delivery_target}
-            durationSec={projectInfo.duration_sec}
-            segmentCount={segments.length}
-            breakpointCount={breakpoints.length}
-            highlightCount={highlights.length}
-          />
+          <Button variant="outline" size="sm" className="text-xs rounded-lg gap-1.5 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover shrink-0" onClick={() => setReAnalyzeOpen(true)}>
+            <RefreshCw className="h-3.5 w-3.5" /> Re-Analyze
+          </Button>
           <Button variant="ghost" size="sm" className="text-xs rounded-lg text-muted-foreground btn-hover shrink-0" onClick={() => navigate("/")}>← New Analysis</Button>
         </div>
       </div>
@@ -1237,6 +1287,62 @@ const Results = () => {
         <ComplianceCard deliveryTarget={projectInfo.delivery_target} breakpoints={breakpoints} totalDuration={totalDuration || projectInfo.duration_sec} />
         <SimilarContent />
       </div>
+
+      {/* Re-Analyze Modal */}
+      <Dialog open={reAnalyzeOpen} onOpenChange={setReAnalyzeOpen}>
+        <DialogContent className="sm:max-w-md glass-panel border-border/40">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Re-Analyze Video</DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Change distribution and content settings, then re-run AI analysis on the same video.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Delivery Target</Label>
+              <Select value={reDeliveryTarget} onValueChange={setReDeliveryTarget}>
+                <SelectTrigger className="bg-surface-0 border-border/30">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ott">OTT / Streaming</SelectItem>
+                  <SelectItem value="broadcast">Broadcast TV</SelectItem>
+                  <SelectItem value="youtube">YouTube</SelectItem>
+                  <SelectItem value="social">Social Media</SelectItem>
+                  <SelectItem value="cable_vod">Cable / VOD</SelectItem>
+                  <SelectItem value="streaming">Streaming</SelectItem>
+                  <SelectItem value="short_form">Short-Form</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Content Type</Label>
+              <Select value={reContentType} onValueChange={setReContentType}>
+                <SelectTrigger className="bg-surface-0 border-border/30">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="short_form">Short Form</SelectItem>
+                  <SelectItem value="tv_episode">TV Episode</SelectItem>
+                  <SelectItem value="feature_film">Feature Film</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setReAnalyzeOpen(false)} disabled={reAnalyzing}>
+              Cancel
+            </Button>
+            <Button size="sm" className="gap-1.5" onClick={handleReAnalyze} disabled={!reAnalyzeChanged || reAnalyzing}>
+              {reAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+              Start Re-Analysis
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
