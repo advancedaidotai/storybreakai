@@ -505,7 +505,7 @@ Deno.serve(async (req) => {
           },
         });
 
-        const { result: analysis, logs: chunkLogs } = await callPegasus(prompt, projectId);
+        const { result: analysis, logs: chunkLogs } = await callPegasus(prompt, projectId, video.s3_uri);
         await flushLogs(supabase, chunkLogs);
 
         await supabase.from("analysis_chunks").update({
