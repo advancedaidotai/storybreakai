@@ -1,7 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useRef, useCallback } from "react";
-import { CloudUpload, Play, Film, AlertCircle, X } from "lucide-react";
+import { CloudUpload, Play, Film, AlertCircle, X, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { supabase } from "@/integrations/supabase/client";
 
 const ACCEPTED_TYPES = ["video/mp4", "video/quicktime"];
 const ACCEPTED_EXT = [".mp4", ".mov"];
@@ -30,63 +32,119 @@ function getVideoDuration(file: File): Promise<number> {
   });
 }
 
+type UploadState = "idle" | "validating" | "requesting" | "uploading" | "done" | "error";
+
 const Index = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isValidating, setIsValidating] = useState(false);
+  const [uploadState, setUploadState] = useState<UploadState>("idle");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [fileName, setFileName] = useState<string>("");
 
-  const validateAndProceed = useCallback(async (file: File) => {
+  const validateAndUpload = useCallback(async (file: File) => {
     setError(null);
-    setIsValidating(true);
+    setUploadState("validating");
+    setFileName(file.name);
 
     // Check file extension
     const ext = "." + file.name.split(".").pop()?.toLowerCase();
     if (!ACCEPTED_EXT.includes(ext)) {
       setError(`Invalid format "${ext}". Only MP4 and MOV files are accepted.`);
-      setIsValidating(false);
+      setUploadState("idle");
       return;
     }
 
     // Check MIME type
     if (file.type && !ACCEPTED_TYPES.includes(file.type)) {
       setError(`Invalid file type. Only MP4 and MOV videos are accepted.`);
-      setIsValidating(false);
+      setUploadState("idle");
       return;
     }
 
     // Check file size
     if (file.size > MAX_SIZE_BYTES) {
       setError(`File is ${formatSize(file.size)} — maximum allowed is 2 GB.`);
-      setIsValidating(false);
+      setUploadState("idle");
       return;
     }
 
     // Check duration
+    let duration = 0;
     try {
-      const duration = await getVideoDuration(file);
+      duration = await getVideoDuration(file);
       if (duration > MAX_DURATION_SEC) {
         const mins = Math.floor(duration / 60);
         const secs = Math.floor(duration % 60);
         setError(`Video is ${mins}:${secs.toString().padStart(2, "0")} long — maximum is 15 minutes.`);
-        setIsValidating(false);
+        setUploadState("idle");
         return;
       }
     } catch {
       setError("Could not read video duration. Please try a different file.");
-      setIsValidating(false);
+      setUploadState("idle");
       return;
     }
 
-    setIsValidating(false);
-    navigate("/processing");
+    // Request presigned URL from edge function
+    setUploadState("requesting");
+    try {
+      const { data, error: fnError } = await supabase.functions.invoke("upload-video", {
+        body: {
+          filename: file.name,
+          content_type: file.type || "video/mp4",
+          file_size: file.size,
+          duration_sec: Math.round(duration),
+        },
+      });
+
+      if (fnError || !data?.presigned_url || !data?.project_id) {
+        setError(data?.error || fnError?.message || "Failed to prepare upload. Please try again.");
+        setUploadState("idle");
+        return;
+      }
+
+      // Upload to S3 via presigned URL with progress
+      setUploadState("uploading");
+      setUploadProgress(0);
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", data.presigned_url, true);
+        xhr.setRequestHeader("Content-Type", file.type || "video/mp4");
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            setUploadProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+          } else {
+            reject(new Error(`Upload failed with status ${xhr.status}`));
+          }
+        };
+
+        xhr.onerror = () => reject(new Error("Network error during upload"));
+        xhr.send(file);
+      });
+
+      setUploadState("done");
+      // Navigate to processing with project_id
+      navigate(`/processing/${data.project_id}`);
+    } catch (err: any) {
+      setError(err?.message || "Upload failed. Please try again.");
+      setUploadState("idle");
+    }
   }, [navigate]);
 
   const handleFiles = useCallback((files: FileList | null) => {
     if (!files || files.length === 0) return;
-    validateAndProceed(files[0]);
-  }, [validateAndProceed]);
+    validateAndUpload(files[0]);
+  }, [validateAndUpload]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -103,6 +161,8 @@ const Index = () => {
     setIsDragOver(false);
     handleFiles(e.dataTransfer.files);
   }, [handleFiles]);
+
+  const isBusy = uploadState !== "idle";
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-3rem)] px-6 py-12">
@@ -129,12 +189,12 @@ const Index = () => {
             ? "border-primary/60 glow-blue scale-[1.01]"
             : "border-border/30 hover:border-primary/30"
           }
-          ${isValidating ? "pointer-events-none opacity-70" : ""}
+          ${isBusy ? "pointer-events-none" : ""}
         `}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={() => fileInputRef.current?.click()}
+        onClick={() => !isBusy && fileInputRef.current?.click()}
       >
         {/* Subtle animated grid background */}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,hsl(217_91%_60%/0.04),transparent_70%)]" />
@@ -149,37 +209,62 @@ const Index = () => {
 
         {/* Content */}
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-5 z-10">
-          <div className={`h-16 w-16 rounded-2xl flex items-center justify-center transition-all duration-500 ${
-            isDragOver
-              ? "bg-primary/20 glow-blue scale-110"
-              : "bg-surface-2/80"
-          }`}>
-            <CloudUpload className={`h-8 w-8 transition-colors duration-300 ${
-              isDragOver ? "text-primary" : "text-muted-foreground/60"
-            }`} />
-          </div>
+          {uploadState === "uploading" ? (
+            <>
+              <div className="h-16 w-16 rounded-2xl bg-primary/20 flex items-center justify-center glow-blue">
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              </div>
+              <div className="text-center w-full max-w-xs">
+                <p className="font-semibold text-primary">Uploading…</p>
+                <p className="text-xs text-muted-foreground mt-1 truncate">{fileName}</p>
+                <Progress value={uploadProgress} className="mt-3 h-1.5" />
+                <p className="text-xs text-muted-foreground mt-1.5 font-mono">{uploadProgress}%</p>
+              </div>
+            </>
+          ) : uploadState === "requesting" || uploadState === "validating" ? (
+            <>
+              <div className="h-16 w-16 rounded-2xl bg-primary/20 flex items-center justify-center">
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              </div>
+              <p className="font-semibold text-primary">
+                {uploadState === "validating" ? "Validating video…" : "Preparing upload…"}
+              </p>
+            </>
+          ) : (
+            <>
+              <div className={`h-16 w-16 rounded-2xl flex items-center justify-center transition-all duration-500 ${
+                isDragOver
+                  ? "bg-primary/20 glow-blue scale-110"
+                  : "bg-surface-2/80"
+              }`}>
+                <CloudUpload className={`h-8 w-8 transition-colors duration-300 ${
+                  isDragOver ? "text-primary" : "text-muted-foreground/60"
+                }`} />
+              </div>
 
-          <div className="text-center">
-            <p className={`font-semibold transition-colors duration-300 ${
-              isDragOver ? "text-primary" : "text-foreground"
-            }`}>
-              {isValidating ? "Validating video…" : isDragOver ? "Release to upload" : "Drop your video here"}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1.5">
-              MP4 or MOV · Max 15 min · Up to 2 GB
-            </p>
-          </div>
+              <div className="text-center">
+                <p className={`font-semibold transition-colors duration-300 ${
+                  isDragOver ? "text-primary" : "text-foreground"
+                }`}>
+                  {isDragOver ? "Release to upload" : "Drop your video here"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  MP4 or MOV · Max 15 min · Up to 2 GB
+                </p>
+              </div>
 
-          <Button
-            size="lg"
-            className="rounded-xl px-8 glow-blue mt-1"
-            onClick={(e) => {
-              e.stopPropagation();
-              fileInputRef.current?.click();
-            }}
-          >
-            Upload Video
-          </Button>
+              <Button
+                size="lg"
+                className="rounded-xl px-8 glow-blue mt-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  fileInputRef.current?.click();
+                }}
+              >
+                Upload Video
+              </Button>
+            </>
+          )}
         </div>
 
         <input
