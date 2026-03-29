@@ -451,6 +451,25 @@ async function callPegasus(
     throw new Error(`Pegasus requires an s3:// video URI, received: ${s3Uri.slice(0, 120)}`);
   }
 
+  // Parse bucket and key from s3:// URI
+  const s3Parts = s3Uri.replace("s3://", "").split("/");
+  const checkBucket = s3Parts[0];
+  const checkKey = s3Parts.slice(1).join("/");
+  const s3Region = Deno.env.get("S3_REGION") || bedrockRegion;
+
+  // Pre-flight: verify file exists in S3 before sending to Bedrock
+  const s3Client = new S3Client({
+    region: s3Region,
+    credentials: { accessKeyId: awsAccessKey, secretAccessKey: awsSecretKey },
+  });
+  try {
+    await s3Client.send(new HeadObjectCommand({ Bucket: checkBucket, Key: checkKey }));
+    console.log(`[analyze-video] S3 pre-flight OK: ${s3Uri}`);
+  } catch (headErr: any) {
+    console.error(`[analyze-video] S3 pre-flight FAILED for ${s3Uri}:`, headErr?.message || headErr);
+    throw new Error(`Video file not found in storage (${s3Uri}). The upload may have failed or the file was deleted. Please re-upload and try again.`);
+  }
+
   const awsAccountId = await getAwsAccountId(awsAccessKey, awsSecretKey, bedrockRegion);
 
   const bedrockClient = new BedrockRuntimeClient({
