@@ -162,7 +162,7 @@ const Processing = () => {
           setError(`Analysis error: ${data.error}`);
           setStatus("failed");
         } else {
-          console.log("[Processing] analyze-video invoked successfully");
+          
         }
       })
       .catch((err: any) => {
