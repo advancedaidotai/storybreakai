@@ -83,7 +83,9 @@ async function signedBedrockRequest(params: {
 const DELIVERY_LABELS: Record<string, string> = {
   youtube: "YouTube (3-5 minute ad-break intervals)",
   cable_vod: "Cable/VOD (8-12 minute ad-break intervals)",
+  cable: "Cable (8-12 minute ad-break intervals)",
   broadcast: "Broadcast/Master (act structure breaks)",
+  ott: "OTT/Streaming (flexible mid-roll ad placements)",
 };
 
 const CONTENT_TYPE_PROMPTS: Record<string, string> = {
