@@ -571,7 +571,8 @@ Deno.serve(async (req) => {
   } catch (err: any) {
     console.error(`[analyze-video] Error for project ${projectId}:`, err.message);
     if (projectId) {
-      await supabase.from("projects").update({ status: "failed" }).eq("id", projectId).catch(() => {});
+      const { error: failErr } = await supabase.from("projects").update({ status: "failed" }).eq("id", projectId);
+      if (failErr) console.error("[analyze-video] Failed to set project failed status:", failErr.message);
     }
     return new Response(JSON.stringify({ error: err.message || "Analysis failed" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
