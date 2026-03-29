@@ -791,11 +791,34 @@ Deno.serve(async (req) => {
       const nextPending = allChunks.find((c: any) => c.status === "pending" || c.status === "analyzing");
 
       if (failedChunk && !nextPending) {
-        // A chunk failed previously and no pending work — mark project failed
-        throw new Error(`Chunk ${failedChunk.chunk_index} previously failed`);
+        // A chunk failed previously — reset ALL failed chunks to pending so we can retry
+        console.log(`[analyze-video] Resetting failed chunks to pending for retry (project ${projectId})`);
+        await supabase
+          .from("analysis_chunks")
+          .update({ status: "pending" })
+          .eq("project_id", projectId)
+          .eq("status", "failed");
+
+        // Re-fetch to pick up the newly pending chunk
+        const { data: retriedChunks } = await supabase
+          .from("analysis_chunks")
+          .select("chunk_index, start_sec, end_sec, overlap_start_sec, overlap_end_sec, status")
+          .eq("project_id", projectId)
+          .order("chunk_index");
+
+        const retryPending = retriedChunks?.find((c: any) => c.status === "pending");
+        if (!retryPending) {
+          throw new Error(`Could not reset failed chunks for retry`);
+        }
+        // Replace allChunks reference for the rest of the flow
+        allChunks.length = 0;
+        retriedChunks!.forEach((c: any) => allChunks.push(c));
       }
 
-      if (!nextPending) {
+      // Re-derive nextPending from (potentially updated) allChunks
+      const currentPending = allChunks.find((c: any) => c.status === "pending" || c.status === "analyzing");
+
+      if (!currentPending) {
         // All chunks complete — trigger merge
         console.log(`[analyze-video] All ${totalChunks} chunks complete — dispatching merge for project ${projectId}`);
         await supabase.from("projects").update({ status: "segments_done" }).eq("id", projectId);
@@ -818,7 +841,7 @@ Deno.serve(async (req) => {
       }
 
       // ── Process ONE chunk ──────────────────────────────────────
-      const chunk = nextPending;
+      const chunk = currentPending;
       const chunkNum = chunk.chunk_index;
       const totalMin = Math.round(durationSec / 60);
 
