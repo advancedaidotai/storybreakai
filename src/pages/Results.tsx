@@ -422,7 +422,7 @@ function Timeline({
   return (
     <div className="glass-panel-elevated rounded-2xl p-5">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="font-semibold text-xs tracking-wide uppercase text-foreground/80">Sequence Intelligence Timeline</h2>
+        <h2 className="font-semibold text-xs tracking-wide uppercase text-foreground/80">Your Story's Timeline</h2>
         <div className="flex items-center gap-2">
           {isLong && zoom > 1 && (
             <span className="text-[10px] font-mono text-primary/60">{zoom.toFixed(1)}×</span>
