@@ -228,6 +228,7 @@ const Index = () => {
           duration_sec: Math.round(duration),
           content_type_enum: contentType,
           content_metadata: buildMetadata(),
+          delivery_target: deliveryTarget,
         },
       });
 
