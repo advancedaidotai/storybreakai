@@ -152,8 +152,8 @@ const Processing = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] px-6">
         <AlertCircle className="h-10 w-10 text-muted-foreground/30 mb-4" />
-        <h1 className="text-xl font-bold text-foreground mb-2">No Active Analysis Found</h1>
-        <p className="text-sm text-muted-foreground mb-6">There's no project being processed at this URL.</p>
+        <h1 className="text-xl font-bold text-foreground mb-2">Hmm, nothing here yet</h1>
+        <p className="text-sm text-muted-foreground mb-6">We couldn't find an active analysis at this URL. Let's start fresh!</p>
         <Button className="rounded-xl glow-blue" onClick={() => navigate("/")}>Start New Analysis</Button>
       </div>
     );
