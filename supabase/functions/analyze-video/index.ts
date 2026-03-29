@@ -602,6 +602,23 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "AI returned no valid segments after normalization" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      // Auto-detect real duration from analysis output
+      if (durationUnknown) {
+        const maxFromSegments = analysis.segments.reduce((m, s) => Math.max(m, s.end_sec), 0);
+        const maxFromBreakpoints = analysis.breakpoints.reduce((m, b) => Math.max(m, b.timestamp_sec), 0);
+        const maxFromHighlights = analysis.highlights.reduce((m, h) => Math.max(m, h.end_sec), 0);
+        const detectedDuration = Math.ceil(Math.max(maxFromSegments, maxFromBreakpoints, maxFromHighlights));
+        if (detectedDuration > 0) {
+          durationSec = detectedDuration;
+          console.log(`[analyze-video] Auto-detected duration: ${detectedDuration}s from analysis results`);
+          await supabase.from("projects").update({ duration_sec: detectedDuration }).eq("id", projectId);
+          await supabase.from("videos").update({ duration_sec: detectedDuration }).eq("project_id", projectId);
+        } else {
+          console.warn(`[analyze-video] Could not detect duration from analysis, keeping default`);
+          await supabase.from("projects").update({ duration_sec: durationSec }).eq("id", projectId);
+        }
+      }
+
       console.log(`[analyze-video] Inserting ${analysis.segments.length} segments...`);
       console.log(`[analyze-video] Inserting ${analysis.breakpoints.length} breakpoints...`);
       console.log(`[analyze-video] Inserting ${analysis.highlights.length} highlights...`);

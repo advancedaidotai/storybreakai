@@ -216,8 +216,8 @@ function ActOverlay({ contentType, duration, onSelectAct }: { contentType: strin
   if (duration < 300) {
     return (
       <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-lg bg-muted/20 border border-border/10">
-        <Clock className="h-3 w-3 text-muted-foreground/50" />
-        <span className="text-[10px] text-muted-foreground/60">Act structure available for videos over 5 minutes</span>
+        <Clock className="h-3 w-3 text-primary/50" />
+        <span className="text-[10px] text-primary/70 font-medium">Short-form structure</span>
       </div>
     );
   }
