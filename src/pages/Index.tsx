@@ -464,7 +464,13 @@ const Index = () => {
       <div className="mb-8 flex items-end justify-between">
         <div>
           <h2 className="text-xl font-bold text-foreground tracking-tight">Let's Analyze Your Video</h2>
-          <p className="text-sm text-muted-foreground mt-1">Tell us about your video and we'll handle the rest.</p>
+          <p className="text-sm text-muted-foreground mt-1">Identify semantic narrative valleys for contextual ad insertion — optimized for your distribution platform.</p>
+          <div className="mt-2">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold uppercase tracking-wide border border-highlight/25 bg-highlight/5 text-highlight/80">
+              <span className="h-1.5 w-1.5 rounded-full bg-highlight/60" />
+              Contextual Ad Insertion via Semantic Narrative Valleys
+            </span>
+          </div>
         </div>
 
         {/* Demo mode trigger — only visible with ?demo=1 or Ctrl+Shift+D */}
