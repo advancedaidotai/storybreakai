@@ -20,9 +20,8 @@ function statusToStepIndex(status: ProjectStatus): number {
     case "uploaded": return 0;
     case "analyzing": return 1;
     case "segments_done": return 2;
-    case "highlights_done": return 3;
-    case "generating_reel": return 4;
-    case "ready": case "complete": return 5;
+    case "highlights_done": return 4;
+    case "generating_reel": case "ready": case "complete": return 5;
     case "failed": return -2;
     default: return -1;
   }
