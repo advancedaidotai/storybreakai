@@ -142,7 +142,7 @@ const Processing = () => {
     };
 
     poll();
-    const interval = setInterval(poll, 3000);
+    const interval = setInterval(poll, 5000);
     return () => { isMounted.current = false; clearInterval(interval); };
   }, [projectId, navigate]);
 

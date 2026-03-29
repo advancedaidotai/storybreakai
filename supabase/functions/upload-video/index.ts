@@ -125,7 +125,8 @@ Deno.serve(async (req) => {
       credentials: { accessKeyId: awsAccessKey, secretAccessKey: awsSecretKey },
     });
 
-    const s3Key = `uploads/${project.id}/${filename}`;
+    const safeFilename = filename.replace(/[\/\\]/g, '').replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 255);
+    const s3Key = `uploads/${project.id}/${safeFilename}`;
     const s3Uri = `s3://${effectiveBucket}/${s3Key}`;
 
     const { error: vidErr } = await supabase.from("videos").insert({
