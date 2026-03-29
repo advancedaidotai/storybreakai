@@ -995,12 +995,26 @@ const Results = () => {
 
   return (
     <div className="flex flex-col px-4 py-4 max-w-[1400px] mx-auto gap-4 animate-fade-in">
+      {/* Solution Statement Banner */}
+      <SolutionBanner />
+
       {/* Content Header */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex-1 min-w-0">
           <ContentHeader project={projectInfo} segments={segments} breakpoints={breakpoints} highlights={highlights} />
         </div>
-        <Button variant="ghost" size="sm" className="text-xs rounded-lg text-muted-foreground btn-hover shrink-0" onClick={() => navigate("/")}>← New Analysis</Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <BusinessCaseButton
+            projectTitle={projectInfo.title}
+            contentType={projectInfo.content_type}
+            deliveryTarget={projectInfo.delivery_target}
+            durationSec={projectInfo.duration_sec}
+            segmentCount={segments.length}
+            breakpointCount={breakpoints.length}
+            highlightCount={highlights.length}
+          />
+          <Button variant="ghost" size="sm" className="text-xs rounded-lg text-muted-foreground btn-hover shrink-0" onClick={() => navigate("/")}>← New Analysis</Button>
+        </div>
       </div>
 
       {/* Video Panels + Detail + Scene Index */}
