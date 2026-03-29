@@ -322,13 +322,13 @@ async function callPegasus(
       contentType: "application/json",
       accept: "application/json",
       body: JSON.stringify({
-        video: {
-          s3: {
-            bucket: s3Uri.replace("s3://", "").split("/")[0],
+        inputPrompt: prompt,
+        mediaSource: {
+          s3Location: {
+            bucketName: s3Uri.replace("s3://", "").split("/")[0],
             objectKey: s3Uri.replace("s3://", "").split("/").slice(1).join("/"),
           },
         },
-        text: prompt,
       }),
     });
 
