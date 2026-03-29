@@ -951,7 +951,15 @@ const Results = () => {
         }
 
         if (projRes.data) setProjectInfo(projRes.data as ProjectInfo);
-        if (vidRes.data) { setVideoUrl(s3UriToUrl(vidRes.data.s3_uri || "", "us-east-1")); setTotalDuration(Number(vidRes.data.duration_sec) || 0); }
+        if (vidRes.data) {
+          setTotalDuration(Number(vidRes.data.duration_sec) || 0);
+          // Fetch presigned URL for private S3 video
+          supabase.functions.invoke("get-video-url", { body: { project_id: projectId } })
+            .then(({ data: urlData }) => {
+              if (urlData?.url) setVideoUrl(urlData.url);
+            })
+            .catch((err) => console.error("[Results] Failed to get video URL:", err));
+        }
         if (segRes.data) setSegments(segRes.data as Segment[]);
         if (bpRes.data) setBreakpoints(bpRes.data as Breakpoint[]);
         if (hlRes.data) setHighlights(hlRes.data as Highlight[]);
