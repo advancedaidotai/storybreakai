@@ -1065,6 +1065,14 @@ const Results = () => {
   const [reContentType, setReContentType] = useState("");
   const [reAnalyzing, setReAnalyzing] = useState(false);
   const [reAnalyzeConfirm, setReAnalyzeConfirm] = useState(false);
+  const [exportApprovedOnly, setExportApprovedOnly] = useState(false);
+
+  // Handler for breakpoint review updates (approval, nudge)
+  const handleBreakpointUpdated = useCallback((id: string, updates: Partial<Breakpoint>) => {
+    setBreakpoints((prev) =>
+      prev.map((bp) => (bp.id === id ? { ...bp, ...updates } : bp))
+    );
+  }, []);
 
   // Sync modal defaults when project loads
   useEffect(() => {
