@@ -909,6 +909,7 @@ const Results = () => {
   const [breakpoints, setBreakpoints] = useState<Breakpoint[]>([]);
   const [highlights, setHighlights] = useState<Highlight[]>([]);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [videoError, setVideoError] = useState(false);
   
   const [totalDuration, setTotalDuration] = useState(0);
   const [selected, setSelected] = useState<SelectedItem | null>(null);
