@@ -11,7 +11,6 @@ const STEPS = [
   { key: "uploaded", label: "Getting your video ready...", icon: CloudUpload },
   { key: "analyzing", label: "Finding the story beats...", icon: Brain },
   { key: "segments_done", label: "Mapping scene boundaries...", icon: Layers },
-  { key: "highlights_done", label: "Spotting the best moments...", icon: Sparkles },
 ] as const;
 
 function statusToStepIndex(status: ProjectStatus): number {
