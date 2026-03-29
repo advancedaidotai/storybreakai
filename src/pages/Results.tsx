@@ -22,7 +22,6 @@ import { SolutionBanner } from "@/components/results/SolutionBanner";
 import { ROICard } from "@/components/results/ROICard";
 import { ComplianceCard } from "@/components/results/ComplianceCard";
 import { SimilarContent } from "@/components/results/SimilarContent";
-import { BusinessCaseButton } from "@/components/results/BusinessCasePDF";
 import { AdBreakStoryboard } from "@/components/results/AdBreakStoryboard";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
