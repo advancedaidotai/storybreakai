@@ -400,7 +400,7 @@ Deno.serve(async (req) => {
       // ── SINGLE-PASS ──────────────────────────────────────────────
       console.log(`[analyze-video] SINGLE-PASS for project ${projectId} (${durationSec}s, ${contentType})`);
       const prompt = buildPrompt({ s3Uri: video.s3_uri, deliveryLabel, deliveryTarget, contentType });
-      const { result: analysis, logs } = await callPegasus(prompt, projectId);
+      const { result: analysis, logs } = await callPegasus(prompt, projectId, video.s3_uri);
       await flushLogs(supabase, logs);
 
       if (analysis.segments.length === 0) {
