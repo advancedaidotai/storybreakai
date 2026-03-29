@@ -1109,6 +1109,8 @@ const Results = () => {
     return {
       analysis: fetchError && !analysisOk ? "failed" : analysisOk ? "ready" : "unavailable",
       edl: hasBreakpoints ? "ready" : "unavailable",
+      fcpxml: hasBreakpoints ? "ready" : "unavailable",
+      premiereXml: hasBreakpoints ? "ready" : "unavailable",
       ottJson: hasBreakpoints ? "ready" : "unavailable",
     };
   }, [segments, breakpoints, fetchError]);
