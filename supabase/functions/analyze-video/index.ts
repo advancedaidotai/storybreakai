@@ -560,8 +560,11 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "AI returned no valid segments after normalization" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      console.log(`[analyze-video] Parsed: ${analysis.segments.length} segments, ${analysis.breakpoints.length} breakpoints, ${analysis.highlights.length} highlights`);
+      console.log(`[analyze-video] Inserting ${analysis.segments.length} segments...`);
+      console.log(`[analyze-video] Inserting ${analysis.breakpoints.length} breakpoints...`);
+      console.log(`[analyze-video] Inserting ${analysis.highlights.length} highlights...`);
       await insertResults(supabase, projectId, analysis);
+      console.log(`[analyze-video] All inserts complete.`);
       await supabase.from("projects").update({ status: "segments_done" }).eq("id", projectId);
       await supabase.from("projects").update({ status: "highlights_done" }).eq("id", projectId);
       console.log(`[analyze-video] Project ${projectId} single-pass complete`);
