@@ -569,7 +569,6 @@ Deno.serve(async (req) => {
       console.log(`[analyze-video] Inserting ${analysis.highlights.length} highlights...`);
       await insertResults(supabase, projectId, analysis);
       console.log(`[analyze-video] All inserts complete.`);
-      await supabase.from("projects").update({ status: "segments_done" }).eq("id", projectId);
       await supabase.from("projects").update({ status: "highlights_done" }).eq("id", projectId);
       console.log(`[analyze-video] Project ${projectId} single-pass complete`);
     } else {

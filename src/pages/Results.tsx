@@ -613,7 +613,7 @@ function BreakpointStoryboard({ breakpoints, selected, currentTime, onCardClick 
           const isActive = activeCardId === bp.id;
           const valley = VALLEY_CONFIG[bp.valley_type || ""] || VALLEY_CONFIG.scene_transition;
           const ValleyIcon = valley.icon;
-          const confNorm = bp.confidence !== null ? (bp.confidence! > 1 ? bp.confidence! / 100 : bp.confidence) : null;
+          const confNorm = bp.confidence;
 
           // Confidence badge color
           const confBadgeBg = confNorm === null ? "bg-muted/30"
@@ -869,7 +869,7 @@ function BreakpointDetail({ bp }: { bp: Breakpoint }) {
         </div>
       )}
       <Row label="Timestamp" value={formatTime(bp.timestamp_sec)} mono />
-      {bp.lead_in_sec != null && <Row label="Lead-In" value={formatTime(bp.lead_in_sec)} mono />}
+      {bp.lead_in_sec != null && <Row label="Lead-In" value={`${bp.lead_in_sec}s`} mono />}
       <ConfidenceRow value={bp.confidence} />
       {bp.ad_slot_duration_rec && <Row label="Ad Slot Rec." value={`${bp.ad_slot_duration_rec}s`} />}
       {bp.reason && <ReasonBox title="Why This Break" text={bp.reason} />}
@@ -888,8 +888,8 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
 
 function ConfidenceRow({ value }: { value: number | null }) {
   if (value === null) return null;
-  const pct = value > 1 ? value : value * 100;
-  return (<div className="flex justify-between"><span className="text-muted-foreground">Confidence</span><span className={`font-semibold ${confidenceColor(value > 1 ? value / 100 : value)}`}>{pct.toFixed(1)}%</span></div>);
+  const pct = value * 100;
+  return (<div className="flex justify-between"><span className="text-muted-foreground">Confidence</span><span className={`font-semibold ${confidenceColor(value)}`}>{pct.toFixed(1)}%</span></div>);
 }
 
 function ReasonBox({ title, text }: { title: string; text: string }) {
