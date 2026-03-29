@@ -448,7 +448,10 @@ async function ensureS3Uri(
   const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY")!;
   const awsSecretKey = Deno.env.get("AWS_SECRET_KEY")!;
   const bedrockRegion = Deno.env.get("BEDROCK_REGION") || "us-east-1";
-  const s3Bucket = Deno.env.get("S3_BUCKET") || "storybreak-ai-videos";
+  const s3Region = Deno.env.get("S3_REGION") || bedrockRegion;
+  const s3BucketEnv = Deno.env.get("S3_BUCKET");
+  if (!s3BucketEnv) console.warn("[analyze-video] S3_BUCKET env var not set, falling back to 'storybreak-ai-videos'");
+  const s3Bucket = s3BucketEnv || "storybreak-ai-videos";
 
   // Derive a filename from the URL
   const urlPath = new URL(currentUri).pathname;
@@ -469,7 +472,7 @@ async function ensureS3Uri(
   const contentType = dlResp.headers.get("content-type") || "video/mp4";
 
   const s3Client = new S3Client({
-    region: bedrockRegion,
+    region: s3Region,
     credentials: {
       accessKeyId: awsAccessKey,
       secretAccessKey: awsSecretKey,

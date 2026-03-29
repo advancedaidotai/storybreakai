@@ -108,8 +108,10 @@ Deno.serve(async (req) => {
     // Regular upload flow — use official AWS SDK for presigning
     const awsAccessKey = Deno.env.get("AWS_ACCESS_KEY");
     const awsSecretKey = Deno.env.get("AWS_SECRET_KEY");
-    const s3Bucket = Deno.env.get("S3_BUCKET") || "storybreak-ai-videos";
-    const region = Deno.env.get("BEDROCK_REGION") || "us-east-1";
+    const s3Bucket = Deno.env.get("S3_BUCKET");
+    if (!s3Bucket) console.warn("[upload-video] S3_BUCKET env var not set, falling back to 'storybreak-ai-videos'");
+    const effectiveBucket = s3Bucket || "storybreak-ai-videos";
+    const region = Deno.env.get("S3_REGION") || Deno.env.get("BEDROCK_REGION") || "us-east-1";
 
     if (!awsAccessKey || !awsSecretKey) {
       return new Response(JSON.stringify({ error: "AWS credentials not configured" }), {
@@ -124,7 +126,7 @@ Deno.serve(async (req) => {
     });
 
     const s3Key = `uploads/${project.id}/${filename}`;
-    const s3Uri = `s3://${s3Bucket}/${s3Key}`;
+    const s3Uri = `s3://${effectiveBucket}/${s3Key}`;
 
     const { error: vidErr } = await supabase.from("videos").insert({
       project_id: project.id,
@@ -141,7 +143,7 @@ Deno.serve(async (req) => {
     }
 
     const command = new PutObjectCommand({
-      Bucket: s3Bucket,
+      Bucket: effectiveBucket,
       Key: s3Key,
       ContentType: content_type,
     });
