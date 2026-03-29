@@ -16,6 +16,7 @@ import { ROICard } from "@/components/results/ROICard";
 import { ComplianceCard } from "@/components/results/ComplianceCard";
 import { SimilarContent } from "@/components/results/SimilarContent";
 import { BusinessCaseButton } from "@/components/results/BusinessCasePDF";
+import { AdBreakStoryboard } from "@/components/results/AdBreakStoryboard";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -1208,12 +1209,17 @@ const Results = () => {
         </div>
       </div>
 
-      {/* Breakpoint Storyboard */}
-      {breakpoints.length > 0 && (
-        <div className="fade-in-600 fade-in-delay-2">
-          <BreakpointStoryboard breakpoints={breakpoints} selected={selected} currentTime={currentTime} onCardClick={handleBreakpointCardClick} />
-        </div>
-      )}
+      {/* Ad Break Storyboard with Thumbnails */}
+      <div className="fade-in-600 fade-in-delay-2">
+        <AdBreakStoryboard
+          breakpoints={breakpoints}
+          videoRef={videoRef}
+          onBreakpointSelect={handleBreakpointCardClick}
+          selectedBreakpointId={selected?.kind === "breakpoint" ? selected.data.id : null}
+          currentTime={currentTime}
+          totalDuration={duration}
+        />
+      </div>
 
       {/* Timeline */}
       <div className="fade-in-600 fade-in-delay-3">

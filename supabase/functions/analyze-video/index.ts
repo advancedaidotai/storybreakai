@@ -706,20 +706,30 @@ Deno.serve(async (req) => {
       }
 
       // Auto-detect real duration from analysis output
-      if (durationUnknown) {
-        const maxFromSegments = analysis.segments.reduce((m, s) => Math.max(m, s.end_sec), 0);
-        const maxFromBreakpoints = analysis.breakpoints.reduce((m, b) => Math.max(m, b.timestamp_sec), 0);
-        const maxFromHighlights = analysis.highlights.reduce((m, h) => Math.max(m, h.end_sec), 0);
-        const detectedDuration = Math.ceil(Math.max(maxFromSegments, maxFromBreakpoints, maxFromHighlights));
-        if (detectedDuration > 0) {
-          durationSec = detectedDuration;
-          console.log(`[analyze-video] Auto-detected duration: ${detectedDuration}s from analysis results`);
-          await supabase.from("projects").update({ duration_sec: detectedDuration }).eq("id", projectId);
-          await supabase.from("videos").update({ duration_sec: detectedDuration }).eq("project_id", projectId);
-        } else {
-          console.warn(`[analyze-video] Could not detect duration from analysis, keeping default`);
-          await supabase.from("projects").update({ duration_sec: durationSec }).eq("id", projectId);
-        }
+      const maxTimestamp = Math.max(
+        ...analysis.segments.map(s => s.end_sec || 0),
+        ...analysis.breakpoints.map(b => b.timestamp_sec || 0),
+        ...analysis.highlights.map(h => h.end_sec || 0),
+        0
+      );
+
+      if (durationUnknown && maxTimestamp > 0) {
+        // Add 5% buffer to account for content beyond last detected timestamp
+        const correctedDuration = Math.ceil(maxTimestamp * 1.05);
+        durationSec = correctedDuration;
+        console.log(`[analyze-video] Auto-detected duration: ${correctedDuration}s (from max timestamp ${maxTimestamp}s + 5% buffer)`);
+        await supabase.from("projects").update({ duration_sec: correctedDuration }).eq("id", projectId);
+        await supabase.from("videos").update({ duration_sec: correctedDuration }).eq("project_id", projectId);
+      } else if (durationSec === 3600 && maxTimestamp > 0 && maxTimestamp < 3600) {
+        // Duration was set to 3600 default but actual content is shorter — correct it
+        const correctedDuration = Math.ceil(maxTimestamp * 1.05);
+        durationSec = correctedDuration;
+        console.log(`[analyze-video] Corrected fallback duration from 3600s to ${correctedDuration}s`);
+        await supabase.from("projects").update({ duration_sec: correctedDuration }).eq("id", projectId);
+        await supabase.from("videos").update({ duration_sec: correctedDuration }).eq("project_id", projectId);
+      } else if (durationUnknown) {
+        console.warn(`[analyze-video] Could not detect duration from analysis, keeping default`);
+        await supabase.from("projects").update({ duration_sec: durationSec }).eq("id", projectId);
       }
 
       console.log(`[analyze-video] Inserting ${analysis.segments.length} segments...`);
