@@ -1,6 +1,6 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Check, Loader2, AlertCircle, RefreshCw, CloudUpload, Brain, Layers, Sparkles, Film } from "lucide-react";
+import { Check, Loader2, AlertCircle, RefreshCw, CloudUpload, Brain, Layers, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/integrations/supabase/client";
