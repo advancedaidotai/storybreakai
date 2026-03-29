@@ -94,11 +94,11 @@ function ProjectCard({
   const handleClick = () => {
     const s = project.status;
     const title = getProjectDisplayTitle(project);
-    if (s === "analyzing" || s === "generating_reel" || s === "segments_done") {
+    if (s === "uploaded" || s === "analyzing" || s === "generating_reel" || s === "segments_done") {
       toast({ title: `Resuming project: ${title}` });
       navigate(`/processing/${project.id}`);
-    } else if (s === "uploaded" || s === "draft") {
-      toast({ title: `Resuming project: ${title}`, description: "Pre-filling form with project metadata." });
+    } else if (s === "draft") {
+      toast({ title: `Project: ${title}`, description: "This project still needs setup." });
       navigate("/");
     } else {
       toast({ title: `Resuming project: ${title}` });
