@@ -23,11 +23,12 @@ import { ROICard } from "@/components/results/ROICard";
 import { ComplianceCard } from "@/components/results/ComplianceCard";
 import { SimilarContent } from "@/components/results/SimilarContent";
 import { AdBreakStoryboard } from "@/components/results/AdBreakStoryboard";
+import { BreakpointReviewPanel } from "@/components/results/BreakpointReviewPanel";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface Segment { id: string; start_sec: number; end_sec: number; type: string; summary: string | null; confidence: number | null; }
-interface Breakpoint { id: string; timestamp_sec: number; type: string | null; reason: string | null; confidence: number | null; lead_in_sec: number | null; valley_type: string | null; ad_slot_duration_rec: number | null; compliance_notes: string | null; }
+interface Breakpoint { id: string; timestamp_sec: number; type: string | null; reason: string | null; confidence: number | null; lead_in_sec: number | null; valley_type: string | null; ad_slot_duration_rec: number | null; compliance_notes: string | null; approval_status?: string; boundary_reasons?: string[]; }
 interface Highlight { id: string; start_sec: number; end_sec: number; score: number | null; reason: string | null; rank_order: number | null; }
 interface AnalysisChunk { id: string; chunk_index: number; start_sec: number; end_sec: number; overlap_start_sec: number | null; overlap_end_sec: number | null; }
 interface ProjectInfo { title: string; content_type: string | null; content_metadata: any; delivery_target: string | null; duration_sec: number | null; }
@@ -810,10 +811,11 @@ interface ReadinessInfo {
 
 // ─── Detail Panel ────────────────────────────────────────────────────────────
 
-function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, onDownloadFormat, readiness, onRetry }: {
+function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, onDownloadFormat, readiness, onRetry, exportApprovedOnly, onToggleApprovedOnly }: {
   selected: SelectedItem | null; onExportJSON: () => void; onDownloadMasterPackage: () => void;
   onDownloadFormat: (fmt: "edl" | "fcpxml" | "premiere" | "ott") => void;
   readiness: ReadinessInfo; onRetry: () => void;
+  exportApprovedOnly: boolean; onToggleApprovedOnly: () => void;
 }) {
   return (
     <div className="glass-panel rounded-2xl p-4 flex flex-col gap-4 h-fit lg:sticky lg:top-16 overflow-auto">
@@ -865,6 +867,10 @@ function DetailPanel({ selected, onExportJSON, onDownloadMasterPackage, onDownlo
       {/* Export Actions */}
       <div className="border-t border-border/20 pt-4 mt-auto">
         <h3 className="text-xs font-semibold mb-3 uppercase tracking-wide text-foreground/70">Get Your Results</h3>
+        <label className="flex items-center gap-2 mb-2.5 cursor-pointer group">
+          <input type="checkbox" checked={exportApprovedOnly} onChange={onToggleApprovedOnly} className="rounded border-border/40 bg-surface-0 text-primary focus:ring-primary/30 h-3.5 w-3.5" />
+          <span className="text-[10px] text-muted-foreground group-hover:text-foreground transition-colors">Export approved breakpoints only</span>
+        </label>
         <div className="flex flex-col gap-2">
           <Button variant="outline" size="sm" className="w-full gap-2 rounded-xl text-xs h-8 border-border/40 hover:border-primary/40 hover:bg-primary/5 btn-hover" onClick={onExportJSON} disabled={readiness.analysis !== "ready"}>
             <FileJson className="h-3.5 w-3.5" /> Export Full Analysis (JSON)
@@ -1064,6 +1070,14 @@ const Results = () => {
   const [reContentType, setReContentType] = useState("");
   const [reAnalyzing, setReAnalyzing] = useState(false);
   const [reAnalyzeConfirm, setReAnalyzeConfirm] = useState(false);
+  const [exportApprovedOnly, setExportApprovedOnly] = useState(false);
+
+  // Handler for breakpoint review updates (approval, nudge)
+  const handleBreakpointUpdated = useCallback((id: string, updates: Partial<Breakpoint>) => {
+    setBreakpoints((prev) =>
+      prev.map((bp) => (bp.id === id ? { ...bp, ...updates } : bp))
+    );
+  }, []);
 
   // Sync modal defaults when project loads
   useEffect(() => {
@@ -1154,11 +1168,32 @@ const Results = () => {
     }
   }, []);
 
+  // Filter breakpoints for export if approved-only is checked
+  const exportBreakpoints = useMemo(() => {
+    if (!exportApprovedOnly) return breakpoints;
+    return breakpoints.filter((b) => b.approval_status === "approved");
+  }, [breakpoints, exportApprovedOnly]);
+
   const handleExportJSON = useCallback(() => {
-    const data = { segments, breakpoints, highlights };
+    const data = {
+      project_id: projectId,
+      title: projectInfo.title,
+      content_type: projectInfo.content_type,
+      delivery_target: projectInfo.delivery_target,
+      duration_sec: projectInfo.duration_sec,
+      generated_at: new Date().toISOString(),
+      export_filter: exportApprovedOnly ? "approved_only" : "all",
+      segments,
+      breakpoints: exportBreakpoints.map((bp) => ({
+        ...bp,
+        approval_status: bp.approval_status || "pending",
+        boundary_reasons: bp.boundary_reasons || [],
+      })),
+      highlights,
+    };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `storybreak-${projectId}.json`; a.click(); URL.revokeObjectURL(url);
-  }, [segments, breakpoints, highlights, projectId]);
+  }, [segments, exportBreakpoints, highlights, projectId, projectInfo, exportApprovedOnly]);
 
   
 
@@ -1174,27 +1209,27 @@ const Results = () => {
     const title = projectInfo.title || "StoryBreak Export";
     const dur = projectInfo.duration_sec || 0;
 
-    downloadFile(generateEDL(breakpoints, title), `${safeTitle}-breakpoints.edl`);
-    setTimeout(() => downloadFile(generateFCPXML(breakpoints, segments, title, dur), `${safeTitle}-breakpoints.fcpxml`, "application/xml"), 300);
-    setTimeout(() => downloadFile(generatePremiereXML(breakpoints, segments, title, dur), `${safeTitle}-breakpoints-premiere.xml`, "application/xml"), 600);
+    downloadFile(generateEDL(exportBreakpoints, title), `${safeTitle}-breakpoints.edl`);
+    setTimeout(() => downloadFile(generateFCPXML(exportBreakpoints, segments, title, dur), `${safeTitle}-breakpoints.fcpxml`, "application/xml"), 300);
+    setTimeout(() => downloadFile(generatePremiereXML(exportBreakpoints, segments, title, dur), `${safeTitle}-breakpoints-premiere.xml`, "application/xml"), 600);
     setTimeout(() => {
-      downloadFile(JSON.stringify(generateOTTManifest(breakpoints, projectId || "", projectInfo), null, 2), `${safeTitle}-ott-manifest.json`, "application/json");
-      toast({ title: "NLE Package exported", description: "EDL, FCP XML, Premiere XML, and OTT Manifest downloaded." });
+      downloadFile(JSON.stringify(generateOTTManifest(exportBreakpoints, projectId || "", projectInfo), null, 2), `${safeTitle}-ott-manifest.json`, "application/json");
+      toast({ title: "NLE Package exported", description: `${exportApprovedOnly ? "Approved" : "All"} breakpoints exported as EDL, FCP XML, Premiere XML, and OTT Manifest.` });
     }, 900);
-  }, [breakpoints, segments, projectInfo, projectId, downloadFile]);
+  }, [exportBreakpoints, segments, projectInfo, projectId, downloadFile, exportApprovedOnly]);
 
   const handleDownloadFormat = useCallback((fmt: "edl" | "fcpxml" | "premiere" | "ott") => {
     const safeTitle = (projectInfo.title || "StoryBreak-Export").replace(/[^a-zA-Z0-9_-]/g, "_");
     const title = projectInfo.title || "StoryBreak Export";
     const dur = projectInfo.duration_sec || 0;
     switch (fmt) {
-      case "edl": downloadFile(generateEDL(breakpoints, title), `${safeTitle}-breakpoints.edl`); break;
-      case "fcpxml": downloadFile(generateFCPXML(breakpoints, segments, title, dur), `${safeTitle}-breakpoints.fcpxml`, "application/xml"); break;
-      case "premiere": downloadFile(generatePremiereXML(breakpoints, segments, title, dur), `${safeTitle}-breakpoints-premiere.xml`, "application/xml"); break;
-      case "ott": downloadFile(JSON.stringify(generateOTTManifest(breakpoints, projectId || "", projectInfo), null, 2), `${safeTitle}-ott-manifest.json`, "application/json"); break;
+      case "edl": downloadFile(generateEDL(exportBreakpoints, title), `${safeTitle}-breakpoints.edl`); break;
+      case "fcpxml": downloadFile(generateFCPXML(exportBreakpoints, segments, title, dur), `${safeTitle}-breakpoints.fcpxml`, "application/xml"); break;
+      case "premiere": downloadFile(generatePremiereXML(exportBreakpoints, segments, title, dur), `${safeTitle}-breakpoints-premiere.xml`, "application/xml"); break;
+      case "ott": downloadFile(JSON.stringify(generateOTTManifest(exportBreakpoints, projectId || "", projectInfo), null, 2), `${safeTitle}-ott-manifest.json`, "application/json"); break;
     }
-    toast({ title: `${fmt.toUpperCase()} exported`, description: `${fmt.toUpperCase()} file downloaded.` });
-  }, [breakpoints, segments, projectInfo, projectId, downloadFile]);
+    toast({ title: `${fmt.toUpperCase()} exported`, description: `${exportApprovedOnly ? "Approved" : "All"} breakpoints exported.` });
+  }, [exportBreakpoints, segments, projectInfo, projectId, downloadFile, exportApprovedOnly]);
 
   // Compute readiness states from loaded data
   const readiness = useMemo<ReadinessInfo>(() => {
@@ -1370,7 +1405,7 @@ const Results = () => {
 
         {/* Detail Panel + Scene Index */}
         <div className="fade-in-600 fade-in-delay-3 space-y-4">
-          <DetailPanel selected={selected} onExportJSON={handleExportJSON} onDownloadMasterPackage={handleDownloadMasterPackage} onDownloadFormat={handleDownloadFormat} readiness={readiness} onRetry={handleRetryAnalysis} />
+          <DetailPanel selected={selected} onExportJSON={handleExportJSON} onDownloadMasterPackage={handleDownloadMasterPackage} onDownloadFormat={handleDownloadFormat} readiness={readiness} onRetry={handleRetryAnalysis} exportApprovedOnly={exportApprovedOnly} onToggleApprovedOnly={() => setExportApprovedOnly((v) => !v)} />
           <SceneIndex segments={segments} contentType={projectInfo.content_type} duration={duration} onSelect={handleSelectSegment} />
         </div>
       </div>
@@ -1387,7 +1422,20 @@ const Results = () => {
         />
       </div>
 
-      {/* Timeline */}
+      {/* Breakpoint Review Panel */}
+      <div className="fade-in-600 fade-in-delay-2">
+        <BreakpointReviewPanel
+          breakpoints={breakpoints}
+          projectId={projectId || ""}
+          contentType={projectInfo.content_type}
+          deliveryTarget={projectInfo.delivery_target}
+          segments={segments}
+          onBreakpointUpdated={handleBreakpointUpdated}
+          onSelectBreakpoint={handleSelectBreakpoint}
+          selectedBreakpointId={selected?.kind === "breakpoint" ? selected.data.id : null}
+        />
+      </div>
+
       <div className="fade-in-600 fade-in-delay-3">
         <Timeline
           segments={segments} breakpoints={breakpoints} highlights={highlights}

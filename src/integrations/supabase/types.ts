@@ -99,6 +99,8 @@ export type Database = {
       breakpoints: {
         Row: {
           ad_slot_duration_rec: number | null
+          approval_status: string
+          boundary_reasons: Json | null
           compliance_notes: string | null
           confidence: number | null
           id: string
@@ -111,6 +113,8 @@ export type Database = {
         }
         Insert: {
           ad_slot_duration_rec?: number | null
+          approval_status?: string
+          boundary_reasons?: Json | null
           compliance_notes?: string | null
           confidence?: number | null
           id?: string
@@ -123,6 +127,8 @@ export type Database = {
         }
         Update: {
           ad_slot_duration_rec?: number | null
+          approval_status?: string
+          boundary_reasons?: Json | null
           compliance_notes?: string | null
           confidence?: number | null
           id?: string
