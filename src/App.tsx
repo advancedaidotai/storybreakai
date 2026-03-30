@@ -16,7 +16,7 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const ALLOWED_DOMAIN = "advancedai.ai";
+const ALLOWED_DOMAINS = ["advancedai.ai", "twelvelabs.io"];
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, user, loading } = useAuth();
@@ -34,10 +34,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   const email = user?.email ?? "";
-  if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) {
+  const domain = email.split("@")[1] ?? "";
+  if (!ALLOWED_DOMAINS.includes(domain)) {
     return <Navigate to="/waitlist" replace />;
   }
-
   return <>{children}</>;
 }
 
