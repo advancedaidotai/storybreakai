@@ -60,6 +60,7 @@ Deno.serve(async (req) => {
       .insert({
         title,
         status: "uploaded",
+        user_id: user.id,
         delivery_target: delivery_target || null,
         content_type: content_type_enum || "short_form",
         content_metadata: content_metadata || null,
