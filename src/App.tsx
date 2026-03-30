@@ -37,8 +37,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const domain = email.split("@")[1] ?? "";
   if (!ALLOWED_DOMAINS.includes(domain)) {
     return <Navigate to="/waitlist" replace />;
-  }
-  }
 
   return <>{children}</>;
 }
