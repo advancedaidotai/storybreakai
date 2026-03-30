@@ -1,32 +1,48 @@
 
 
-## Plan: Require Google Login & Redesign Auth Page
+## Plan: Store Waitlisted Emails in Database
 
 ### What Changes
 
-1. **Make `ProtectedRoute` enforce authentication** (src/App.tsx)
-   - Use the existing `useAuth` hook to check session state
-   - If loading, show a spinner
-   - If no session, redirect to `/auth`
-   - Remove guest access
+1. **Create `waitlist_signups` table** via migration
+   - Columns: `id` (uuid, PK), `email` (text, unique, not null), `user_id` (uuid, nullable), `created_at` (timestamptz, default now())
+   - RLS policy: allow inserts from authenticated users, allow select for admins only
+   - On conflict (email) do nothing — so repeat visits don't create duplicates
 
-2. **Remove "Continue as Guest" from Auth page** (src/pages/Auth.tsx)
-   - Remove the guest button and the "or" divider
-   - Redesign the login page to be more visually attractive:
-     - Add a gradient background with subtle animated glow effects
-     - Larger logo presentation with tagline
-     - Feature highlights / value props below the sign-in button (e.g. "AI-powered video analysis", "Smart ad break detection", "Instant storyboards")
-     - More visual polish: glassmorphism card, subtle border glow
-
-3. **Add sign-out to TopNav** (src/components/layout/TopNav.tsx)
-   - Show user avatar/email and a sign-out button in the top nav
-   - Use `useAuth` hook + `supabase.auth.signOut()`
+2. **Update `src/pages/Waitlist.tsx`** to insert the user's email on mount
+   - On component mount, upsert the user's email into `waitlist_signups`
+   - Silent operation — no UI change needed, just fire-and-forget insert
 
 ### Files to Modify
-- `src/App.tsx` — enforce auth in `ProtectedRoute`
-- `src/pages/Auth.tsx` — remove guest option, enhance visual design
-- `src/components/layout/TopNav.tsx` — add user info + sign out
+- **New migration** — create `waitlist_signups` table
+- **`src/pages/Waitlist.tsx`** — add upsert call on mount
 
-### No database changes needed
-The existing auth system (Google OAuth via Lovable Cloud) is already configured. This is purely a frontend enforcement change.
+### Technical Details
+```sql
+CREATE TABLE public.waitlist_signups (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email text UNIQUE NOT NULL,
+  user_id uuid,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.waitlist_signups ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Authenticated users can insert own signup"
+  ON public.waitlist_signups FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "Authenticated users can read own signup"
+  ON public.waitlist_signups FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+```
+
+In Waitlist.tsx, add to the existing `useEffect`:
+```typescript
+supabase.from("waitlist_signups")
+  .upsert({ email: user.email, user_id: user.id }, { onConflict: "email" })
+  .then(() => {});
+```
 
