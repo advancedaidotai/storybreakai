@@ -12,6 +12,14 @@ export default function Waitlist() {
   const [fired, setFired] = useState(false);
 
   useEffect(() => {
+    if (user?.email) {
+      (supabase.from as any)("waitlist_signups")
+        .upsert({ email: user.email, user_id: user.id }, { onConflict: "email" })
+        .then(() => {});
+    }
+  }, [user]);
+
+  useEffect(() => {
     if (!fired) {
       setFired(true);
       const end = Date.now() + 2500;
