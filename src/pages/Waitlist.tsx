@@ -13,7 +13,7 @@ export default function Waitlist() {
 
   useEffect(() => {
     if (user?.email) {
-      supabase.from("waitlist_signups")
+      (supabase.from as any)("waitlist_signups")
         .upsert({ email: user.email, user_id: user.id }, { onConflict: "email" })
         .then(() => {});
     }
