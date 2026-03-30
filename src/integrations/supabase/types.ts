@@ -233,6 +233,7 @@ export type Database = {
           id: string
           status: Database["public"]["Enums"]["project_status"]
           title: string
+          user_id: string | null
         }
         Insert: {
           content_metadata?: Json | null
@@ -244,6 +245,7 @@ export type Database = {
           id?: string
           status?: Database["public"]["Enums"]["project_status"]
           title: string
+          user_id?: string | null
         }
         Update: {
           content_metadata?: Json | null
@@ -255,6 +257,7 @@ export type Database = {
           id?: string
           status?: Database["public"]["Enums"]["project_status"]
           title?: string
+          user_id?: string | null
         }
         Relationships: []
       }
