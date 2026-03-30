@@ -11,12 +11,15 @@ import Index from "./pages/Index";
 import Processing from "./pages/Processing";
 import Results from "./pages/Results";
 import Auth from "./pages/Auth";
+import Waitlist from "./pages/Waitlist";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+const ALLOWED_DOMAIN = "advancedai.ai";
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { session, loading } = useAuth();
+  const { session, user, loading } = useAuth();
 
   if (loading) {
     return (
@@ -28,6 +31,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!session) {
     return <Navigate to="/auth" replace />;
+  }
+
+  const email = user?.email ?? "";
+  if (!email.endsWith(`@${ALLOWED_DOMAIN}`)) {
+    return <Navigate to="/waitlist" replace />;
   }
 
   return <>{children}</>;
@@ -42,6 +50,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/waitlist" element={<Waitlist />} />
             <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
               <Route path="/" element={<Index />} />
               <Route path="/processing" element={<Navigate to="/" replace />} />
