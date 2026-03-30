@@ -16,7 +16,7 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-const ALLOWED_DOMAIN = "advancedai.ai";
+const ALLOWED_DOMAINS = ["advancedai.ai", "twelvelabs.io"];
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { session, user, loading } = useAuth();
